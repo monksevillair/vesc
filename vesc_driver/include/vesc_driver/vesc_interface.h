@@ -14,6 +14,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include "vesc_driver/vesc_packet.h"
+#include <boost/thread/mutex.hpp>
 
 namespace vesc_driver
 {
@@ -96,6 +97,8 @@ private:
   // Pimpl - hide serial port members from class users
   class Impl;
   boost::scoped_ptr<Impl> impl_;
+
+  boost::mutex send_mutex_;
 };
 
 // todo: review

@@ -3,7 +3,7 @@
 #include <pluginlib/class_list_macros.h>
 #include <ros/ros.h>
 
-#include "vesc_driver/vesc_driver.h"
+#include <vesc_driver/vesc_ros_driver.h>
 
 namespace vesc_driver
 {
@@ -18,14 +18,14 @@ private:
 
   virtual void onInit(void);
 
-  boost::shared_ptr<VescDriver> vesc_driver_;
+  boost::shared_ptr<VescRosDriver> vesc_driver_;
 
 }; // class VescDriverNodelet
 
 void VescDriverNodelet::onInit()
 {
   NODELET_DEBUG("Initializing VESC driver nodelet");
-  vesc_driver_.reset(new VescDriver(getNodeHandle(), getPrivateNodeHandle()));
+  vesc_driver_.reset(new VescRosDriver(getNodeHandle(), getPrivateNodeHandle()));
 }
 
 } // namespace vesc_driver

@@ -34,8 +34,13 @@ public:
 
   pthread_t rx_thread_;
   bool rx_thread_run_;
+
+  boost::mutex packet_handler_mutex_;
   PacketHandlerFunction packet_handler_;
+
+  boost::mutex error_handler_mutex_;
   ErrorHandlerFunction error_handler_;
+
   serial::Serial serial_;
   VescFrame::CRC send_crc_;
 };
@@ -69,10 +74,14 @@ void* VescInterface::Impl::rxThread(void)
               std::ostringstream ss;
               ss << "Out-of-sync with VESC, unknown data leading valid frame. Discarding "
                  << std::distance(iter_begin, iter) << " bytes.";
+              boost::mutex::scoped_lock error_handler_lock(error_handler_mutex_);
               error_handler_(ss.str());
             }
-            // call packet handler
-            packet_handler_(packet);
+            {
+              boost::mutex::scoped_lock packet_handler_lock(packet_handler_mutex_);
+              // call packet handler
+              packet_handler_(packet);
+            }
             // update state
             iter = iter + packet->frame().size();
             iter_begin = iter;
@@ -84,6 +93,7 @@ void* VescInterface::Impl::rxThread(void)
             break; // for (iter_sof...
           }
           else {
+            boost::mutex::scoped_lock error_handler_lock(error_handler_mutex_);
             // else, this was not a packet, move on to next byte
             error_handler_(error);
           }
@@ -100,6 +110,7 @@ void* VescInterface::Impl::rxThread(void)
       if (std::distance(iter_begin, iter) > 0) {
         std::ostringstream ss;
         ss << "Out-of-sync with VESC, discarding " << std::distance(iter_begin, iter) << " bytes.";
+        boost::mutex::scoped_lock error_handler_lock(error_handler_mutex_);
         error_handler_(ss.str());
       }
       buffer.erase(buffer.begin(), iter);
@@ -110,6 +121,7 @@ void* VescInterface::Impl::rxThread(void)
       std::max(bytes_needed, std::min(4096, static_cast<int>(serial_.available())));
     int bytes_read = serial_.read(buffer, bytes_to_read);
     if (bytes_needed > 0 && 0 == bytes_read && !buffer.empty()) {
+      boost::mutex::scoped_lock error_handler_lock(error_handler_mutex_);
       error_handler_("Possibly out-of-sync with VESC, read timout in the middle of a frame.");
     }
 
@@ -136,19 +148,20 @@ VescInterface::~VescInterface()
 
 void VescInterface::setPacketHandler(const PacketHandlerFunction& handler)
 {
-  // todo - definately need mutex
+  boost::mutex::scoped_lock packet_handler_lock(impl_->packet_handler_mutex_);
   impl_->packet_handler_ = handler;
 }
 
 void VescInterface::setErrorHandler(const ErrorHandlerFunction& handler)
 {
-  // todo - definately need mutex
+  boost::mutex::scoped_lock error_handler_lock(impl_->error_handler_mutex_);
   impl_->error_handler_ = handler;
 }
 
 void VescInterface::connect(const std::string& port)
 {
-  // todo - mutex?
+  boost::mutex::scoped_lock packet_handler_lock(impl_->packet_handler_mutex_);
+  boost::mutex::scoped_lock error_handler_lock(impl_->error_handler_mutex_);
 
   if (isConnected()) {
     throw SerialException("Already connected to serial port.");
@@ -174,8 +187,9 @@ void VescInterface::connect(const std::string& port)
 
 void VescInterface::disconnect()
 {
-  // todo - mutex?
-
+  boost::mutex::scoped_lock packet_handler_lock(impl_->packet_handler_mutex_);
+  boost::mutex::scoped_lock error_handler_lock(impl_->error_handler_mutex_);
+  boost::mutex::scoped_lock send_lock(send_mutex_);
   if (isConnected()) {
     // bring down read thread
     impl_->rx_thread_run_ = false;
@@ -193,6 +207,7 @@ bool VescInterface::isConnected() const
 
 void VescInterface::send(const VescPacket& packet)
 {
+  boost::mutex::scoped_lock send_lock(send_mutex_);
   size_t written = impl_->serial_.write(packet.frame());
   if (written != packet.frame().size()) {
     std::stringstream ss;

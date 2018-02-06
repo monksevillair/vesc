@@ -7,16 +7,18 @@
 #include <sstream>
 
 #include <boost/bind.hpp>
-#include <vesc_msgs/VescStateStamped.h>
 
 namespace vesc_driver
 {
 
 VescDriver::VescDriver(ros::NodeHandle nh,
-                       ros::NodeHandle private_nh) :
+                       ros::NodeHandle private_nh,
+                       const ServoSensorHandlerFunction& servo_sensor_handler,
+                       const StateHandlerFunction& state_handler) :
   vesc_(std::string(),
         boost::bind(&VescDriver::vescPacketCallback, this, _1),
         boost::bind(&VescDriver::vescErrorCallback, this, _1)),
+  servo_sensor_handler_(servo_sensor_handler), state_handler_(state_handler),
   duty_cycle_limit_(private_nh, "duty_cycle", -1.0, 1.0), current_limit_(private_nh, "current"),
   brake_limit_(private_nh, "brake"), speed_limit_(private_nh, "speed"),
   position_limit_(private_nh, "position"), servo_limit_(private_nh, "servo", 0.0, 1.0),
@@ -39,25 +41,6 @@ VescDriver::VescDriver(ros::NodeHandle nh,
     ros::shutdown();
     return;
   }
-
-  // create vesc state (telemetry) publisher
-  state_pub_ = nh.advertise<vesc_msgs::VescStateStamped>("sensors/core", 10);
-
-  // since vesc state does not include the servo position, publish the commanded
-  // servo position as a "sensor"
-  servo_sensor_pub_ = nh.advertise<std_msgs::Float64>("sensors/servo_position_command", 10);
-
-  // subscribe to motor and servo command topics
-  duty_cycle_sub_ = nh.subscribe("commands/motor/duty_cycle", 10,
-                                 &VescDriver::dutyCycleCallback, this);
-  current_sub_ = nh.subscribe("commands/motor/current", 10, &VescDriver::currentCallback, this);
-  brake_sub_ = nh.subscribe("commands/motor/brake", 10, &VescDriver::brakeCallback, this);
-  speed_sub_ = nh.subscribe("commands/motor/speed", 10, &VescDriver::speedCallback, this);
-  position_sub_ = nh.subscribe("commands/motor/position", 10, &VescDriver::positionCallback, this);
-  servo_sub_ = nh.subscribe("commands/servo/position", 10, &VescDriver::servoCallback, this);
-
-  // create a 50Hz timer, used for state machine & polling VESC telemetry
-  timer_ = nh.createTimer(ros::Duration(1.0/50.0), &VescDriver::timerCallback, this);
 }
 
   /* TODO or TO-THINKABOUT LIST
@@ -73,15 +56,15 @@ VescDriver::VescDriver(ros::NodeHandle nh,
     - try to predict vesc bounds (from vesc config) and command detect bounds errors
   */
 
-void VescDriver::timerCallback(const ros::TimerEvent& event)
+  bool VescDriver::executionCycle()
 {
   // VESC interface should not unexpectedly disconnect, but test for it anyway
   if (!vesc_.isConnected()) {
     ROS_FATAL("Unexpectedly disconnected from serial port.");
-    timer_.stop();
-    ros::shutdown();
-    return;
+    return false;
   }
+
+  boost::mutex::scoped_lock mode_lock(mode_mutex_);
 
   /*
    * Driver state machine, modes:
@@ -103,8 +86,11 @@ void VescDriver::timerCallback(const ros::TimerEvent& event)
   }
   else {
     // unknown mode, how did that happen?
-    assert(false && "unknown driver mode");
+    ROS_FATAL("unknown driver mode");
+    return false;
   }
+
+  return true;
 }
 
 void VescDriver::vescPacketCallback(const boost::shared_ptr<VescPacket const>& packet)
@@ -129,12 +115,13 @@ void VescDriver::vescPacketCallback(const boost::shared_ptr<VescPacket const>& p
     state_msg->state.distance_traveled = values->tachometer_abs();
     state_msg->state.fault_code = values->fault_code();
 
-    state_pub_.publish(state_msg);
+    state_handler_(state_msg);
   }
   else if (packet->name() == "FWVersion") {
     boost::shared_ptr<VescPacketFWVersion const> fw_version =
       boost::dynamic_pointer_cast<VescPacketFWVersion const>(packet);
-    // todo: might need lock here
+
+    boost::mutex::scoped_lock mode_lock(mode_mutex_);
     fw_version_major_ = fw_version->fwMajor();
     fw_version_minor_ = fw_version->fwMinor();
   }
@@ -145,80 +132,59 @@ void VescDriver::vescErrorCallback(const std::string& error)
   ROS_ERROR("%s", error.c_str());
 }
 
-/**
- * @param duty_cycle Commanded VESC duty cycle. Valid range for this driver is -1 to +1. However,
- *                   note that the VESC may impose a more restrictive bounds on the range depending
- *                   on its configuration, e.g. absolute value is between 0.05 and 0.95.
- */
-void VescDriver::dutyCycleCallback(const std_msgs::Float64::ConstPtr& duty_cycle)
+bool VescDriver::isInOperationMode()
 {
-  if (driver_mode_ = MODE_OPERATING) {
+  boost::mutex::scoped_lock mode_lock(mode_mutex_);
+
+  return (driver_mode_ == MODE_OPERATING);
+}
+
+void VescDriver::setDutyCycle(const std_msgs::Float64::ConstPtr& duty_cycle)
+{
+  if (isInOperationMode()) {
     vesc_.setDutyCycle(duty_cycle_limit_.clip(duty_cycle->data));
   }
 }
 
-/**
- * @param current Commanded VESC current in Amps. Any value is accepted by this driver. However,
- *                note that the VESC may impose a more restrictive bounds on the range depending on
- *                its configuration.
- */
-void VescDriver::currentCallback(const std_msgs::Float64::ConstPtr& current)
+void VescDriver::setCurrent(const std_msgs::Float64::ConstPtr& current)
 {
-  if (driver_mode_ = MODE_OPERATING) {
+  if (isInOperationMode()) {
     vesc_.setCurrent(current_limit_.clip(current->data));
   }
 }
 
-/**
- * @param brake Commanded VESC braking current in Amps. Any value is accepted by this driver.
- *              However, note that the VESC may impose a more restrictive bounds on the range
- *              depending on its configuration.
- */
-void VescDriver::brakeCallback(const std_msgs::Float64::ConstPtr& brake)
+void VescDriver::setBrake(const std_msgs::Float64::ConstPtr& brake)
 {
-  if (driver_mode_ = MODE_OPERATING) {
+  if (isInOperationMode()) {
     vesc_.setBrake(brake_limit_.clip(brake->data));
   }
 }
 
-/**
- * @param speed Commanded VESC speed in electrical RPM. Electrical RPM is the mechanical RPM
- *              multiplied by the number of motor poles. Any value is accepted by this
- *              driver. However, note that the VESC may impose a more restrictive bounds on the
- *              range depending on its configuration.
- */
-void VescDriver::speedCallback(const std_msgs::Float64::ConstPtr& speed)
+void VescDriver::setSpeed(const std_msgs::Float64::ConstPtr& speed)
 {
-  if (driver_mode_ = MODE_OPERATING) {
+  if (isInOperationMode()) {
     vesc_.setSpeed(speed_limit_.clip(speed->data));
   }
 }
 
-/**
- * @param position Commanded VESC motor position in radians. Any value is accepted by this driver.
- *                 Note that the VESC must be in encoder mode for this command to have an effect.
- */
-void VescDriver::positionCallback(const std_msgs::Float64::ConstPtr& position)
+void VescDriver::setPosition(const std_msgs::Float64::ConstPtr& position)
 {
-  if (driver_mode_ = MODE_OPERATING) {
+  if (isInOperationMode()) {
     // ROS uses radians but VESC seems to use degrees. Convert to degrees.
     double position_deg = position_limit_.clip(position->data) * 180.0 / M_PI;
     vesc_.setPosition(position_deg);
   }
 }
 
-/**
- * @param servo Commanded VESC servo output position. Valid range is 0 to 1.
- */
-void VescDriver::servoCallback(const std_msgs::Float64::ConstPtr& servo)
+void VescDriver::setServo(const std_msgs::Float64::ConstPtr& servo)
 {
-  if (driver_mode_ = MODE_OPERATING) {
+  if (isInOperationMode()) {
     double servo_clipped(servo_limit_.clip(servo->data));
     vesc_.setServo(servo_clipped);
     // publish clipped servo value as a "sensor"
     std_msgs::Float64::Ptr servo_sensor_msg(new std_msgs::Float64);
     servo_sensor_msg->data = servo_clipped;
-    servo_sensor_pub_.publish(servo_sensor_msg);
+    servo_sensor_handler_(servo_sensor_msg);
   }
 }
 

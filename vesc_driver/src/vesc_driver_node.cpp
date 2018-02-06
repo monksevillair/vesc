@@ -1,6 +1,6 @@
 #include <ros/ros.h>
 
-#include "vesc_driver/vesc_driver.h"
+#include <vesc_driver/vesc_ros_driver.h>
 
 int main(int argc, char** argv)
 {
@@ -8,7 +8,7 @@ int main(int argc, char** argv)
   ros::NodeHandle nh;
   ros::NodeHandle private_nh("~");
 
-  vesc_driver::VescDriver vesc_driver(nh, private_nh);
+  vesc_driver::VescRosDriver vesc_driver(nh, private_nh);
 
   ros::spin();
 
