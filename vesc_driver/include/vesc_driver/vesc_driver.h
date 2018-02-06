@@ -24,8 +24,7 @@ public:
   typedef boost::function<void (const boost::shared_ptr<std_msgs::Float64>&)> ServoSensorHandlerFunction;
   typedef boost::function<void (const boost::shared_ptr<vesc_msgs::VescStateStamped>&)> StateHandlerFunction;
 
-  VescDriver(ros::NodeHandle nh,
-             ros::NodeHandle private_nh,
+  VescDriver(ros::NodeHandle private_nh,
              const ServoSensorHandlerFunction& servo_sensor_handler = ServoSensorHandlerFunction(),
              const StateHandlerFunction& state_handler = StateHandlerFunction());
 

@@ -11,8 +11,7 @@
 namespace vesc_driver
 {
 
-VescDriver::VescDriver(ros::NodeHandle nh,
-                       ros::NodeHandle private_nh,
+VescDriver::VescDriver(ros::NodeHandle private_nh,
                        const ServoSensorHandlerFunction& servo_sensor_handler,
                        const StateHandlerFunction& state_handler) :
   vesc_(std::string(),

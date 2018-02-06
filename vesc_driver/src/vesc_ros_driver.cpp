@@ -12,7 +12,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 namespace vesc_driver
 {
 VescRosDriver::VescRosDriver(ros::NodeHandle nh, ros::NodeHandle private_nh)
-  : driver_(nh, private_nh,
+  : driver_(private_nh,
             boost::bind(&VescRosDriver::servoSensorCB, this, _1),
             boost::bind(&VescRosDriver::stateCB, this, _1))
 {
