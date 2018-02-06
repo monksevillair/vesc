@@ -1,0 +1,180 @@
+/*
+Created by clemens on 06.02.18.
+This file is part of the software provided by ARTI
+Copyright (c) 2018, ARTI
+All rights reserved.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#include <vesc_differential_drive/vesc_differntial_drive.h>
+#include <nav_msgs/Odometry.h>
+#include <angles/angles.h>
+
+namespace vesc_differntial_drive
+{
+VescDifferntialDrive::VescDifferntialDrive(ros::NodeHandle nh, ros::NodeHandle private_nh,
+                                           const ros::NodeHandle &left_motor_private_nh,
+                                           const ros::NodeHandle &right_motor_private_nh)
+: nh_(nh), left_motor_(left_motor_private_nh, boost::bind(&VescDifferntialDrive::leftMotorSpeed, this, _1, _2)),
+  has_left_motor_speed_(false),
+  right_motor_(right_motor_private_nh, boost::bind(&VescDifferntialDrive::rightMotorSpeed, this, _1, _2)),
+  has_right_motor_speed_(false), linear_velocity_odom_(0.), angular_velocity_odom_(0.), x_odom_(0.), y_odom_(0.),
+  yaw_odom_(0.)
+{
+  if (!private_nh.getParam("max_velocity_linear", max_velocity_linear_))
+  {
+    ROS_ERROR("can't get paramter max_velocity_linear");
+    throw std::invalid_argument("can't get paramter");
+  }
+  if (max_velocity_linear_ < 0.)
+  {
+    ROS_ERROR("max_velocity_linear is negative");
+    throw std::invalid_argument("wrong range of paramter");
+  }
+
+  if (!private_nh.getParam("max_velocity_angular", max_velocity_angular_))
+  {
+    ROS_ERROR("can't get paramter max_velocity_angular");
+    throw std::invalid_argument("can't get paramter");
+  }
+  if (max_velocity_angular_ < 0.)
+  {
+    ROS_ERROR("max_velocity_angular is negative");
+    throw std::invalid_argument("wrong range of paramter");
+  }
+
+  if (!private_nh.getParam("track_width", track_width_))
+  {
+    ROS_ERROR("can't get paramter track_width");
+    throw std::invalid_argument("can't get paramter");
+  }
+
+  if (!private_nh.getParam("wheel_diameter", wheel_diameter_))
+  {
+    ROS_ERROR("can't get paramter wheel_diameter");
+    throw std::invalid_argument("can't get paramter");
+  }
+
+  velocity_correction_left_ = private_nh.param<double>("velocity_correction_left", 1.0);
+  velocity_correction_right_ = private_nh.param<double>("velocity_correction_right", 1.0);
+
+  publish_odom_ = private_nh.param<bool>("publish_odom", true);
+  if (publish_odom_)
+  {
+    odom_pub_ = nh_.advertise<nav_msgs::Odometry>("/odom", 1);
+  }
+
+  publish_tf_ = private_nh.param<bool>("publish_tf", true);
+
+  odom_frame_ = private_nh.param<std::string>("odom_frame", "/odom");
+  base_frame_ = private_nh.param<std::string>("base_frame", "/base_link");
+
+  cmd_vel_sub_ = nh_.subscribe("/cmd_vel", 1, &VescDifferntialDrive::commandVelocityCB, this);
+}
+
+void VescDifferntialDrive::leftMotorSpeed(const double& speed, const ros::Time &time)
+{
+  updateOdometry(time);
+  has_left_motor_speed_ = true;
+  left_motor_speed_ = speed;
+}
+
+void VescDifferntialDrive::rightMotorSpeed(const double& speed, const ros::Time &time)
+{
+  updateOdometry(time);
+  has_right_motor_speed_ = true;
+  right_motor_speed_ = speed;
+}
+
+void VescDifferntialDrive::commandVelocityCB(const geometry_msgs::Twist &cmd_vel)
+{
+  const double linear_velocity = ensurBounds(cmd_vel.linear.x, max_velocity_linear_);
+  const double angular_velocity = ensurBounds(cmd_vel.angular.z, max_velocity_angular_);
+
+  const double left_velocity = (linear_velocity - angular_velocity * track_width_ / 2.) * velocity_correction_left_;
+  const double right_velocity = (linear_velocity + angular_velocity * track_width_ / 2.) * velocity_correction_right_;
+
+  const double left_rpm = left_velocity * 2. / wheel_diameter_;
+  const double right_rpm = right_velocity * 2. / wheel_diameter_;
+
+  left_motor_.sendRpms(left_rpm);
+  right_motor_.sendRpms(right_rpm);
+}
+
+void VescDifferntialDrive::updateOdometry(const ros::Time time)
+{
+  if (!has_right_motor_speed_ || !has_left_motor_speed_)
+    return;
+
+  const double left_velocity = left_motor_speed_ * wheel_diameter_ / 2. / velocity_correction_left_;
+  const double right_velocity = right_motor_speed_ * wheel_diameter_ / 2. / velocity_correction_right_;
+
+  if (!std::isfinite(left_velocity) || !std::isfinite(right_velocity))
+  {
+    ROS_ERROR_STREAM("velocity of motors is not valid (NAN or INF)" << " left_velocity: " << left_velocity
+                                                                    << " right_velocity: " << right_velocity);
+    return;
+  }
+
+  linear_velocity_odom_ = (left_velocity + right_velocity) / 2.;
+  angular_velocity_odom_ = (right_velocity - left_velocity) / track_width_;
+
+  if (odom_update_time_.isValid())
+  {
+    double time_difference = (time - odom_update_time_).toSec();
+
+    if (time_difference < 0.)
+    {
+      ROS_WARN("time difference for odom update is negative skiping update");
+      return;
+    }
+
+    x_odom_ += linear_velocity_odom_ * std::cos(yaw_odom_) * time_difference;
+    y_odom_ += linear_velocity_odom_ * std::sin(yaw_odom_) * time_difference;
+    yaw_odom_ += angular_velocity_odom_ * time_difference;
+    yaw_odom_ = angles::normalize_angle(yaw_odom_);
+  }
+
+  odom_update_time_ = time;
+
+  publishOdom();
+}
+
+void VescDifferntialDrive::publishOdom()
+{
+  const tf::Pose odom_pose(tf::createQuaternionFromYaw(yaw_odom_), tf::Vector3(x_odom_, y_odom_, 0.));
+
+  if (publish_odom_)
+  {
+    nav_msgs::Odometry odom_msg;
+    odom_msg.header.stamp = odom_update_time_;
+    odom_msg.header.frame_id = odom_frame_;
+    odom_msg.child_frame_id = base_frame_;
+
+    tf::poseTFToMsg(odom_pose, odom_msg.pose.pose);
+
+    odom_msg.twist.twist.linear.x = linear_velocity_odom_;
+    odom_msg.twist.twist.angular.z = angular_velocity_odom_;
+
+    odom_pub_.publish(odom_msg);
+  }
+
+  if (publish_tf_)
+  {
+    tf::StampedTransform stamp_transform(odom_pose, odom_update_time_, odom_frame_, base_frame_);
+    tf_broadcaster_.sendTransform(stamp_transform);
+  }
+}
+
+double VescDifferntialDrive::ensurBounds(double value, double max)
+{
+  return ensurBounds(value, -max, max);
+}
+
+double VescDifferntialDrive::ensurBounds(double value, double min, double max)
+{
+  return std::min(std::max(value, min), max);
+}
+
+}
