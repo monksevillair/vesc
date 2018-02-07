@@ -31,6 +31,8 @@ VescDriver::VescDriver(ros::NodeHandle private_nh,
     return;
   }
 
+  ROS_INFO_STREAM("port: '" << port << "'");
+
   // attempt to connect to the serial port
   try {
     vesc_.connect(port);
@@ -101,7 +103,6 @@ void VescDriver::vescPacketCallback(const boost::shared_ptr<VescPacket const>& p
     vesc_msgs::VescStateStamped::Ptr state_msg(new vesc_msgs::VescStateStamped);
     state_msg->header.stamp = ros::Time::now();
     state_msg->state.voltage_input = values->v_in();
-    state_msg->state.temperature_pcb = values->temp_pcb();
     state_msg->state.current_motor = values->current_motor();
     state_msg->state.current_input = values->current_in();
     state_msg->state.speed = values->rpm();
@@ -162,6 +163,7 @@ void VescDriver::setBrake(const std_msgs::Float64::ConstPtr& brake)
 void VescDriver::setSpeed(const std_msgs::Float64::ConstPtr& speed)
 {
   if (isInOperationMode()) {
+    ROS_INFO_STREAM("setSpeed: " << speed->data);
     vesc_.setSpeed(speed_limit_.clip(speed->data));
   }
 }
