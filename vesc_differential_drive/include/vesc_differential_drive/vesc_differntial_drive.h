@@ -66,6 +66,10 @@ private:
 
   ros::Subscriber cmd_vel_sub_;
 
+  ros::Timer timer_;
+
+  void timerCB(const ros::TimerEvent& event);
+
   void updateOdometry(const ros::Time time);
 
   void publishOdom();

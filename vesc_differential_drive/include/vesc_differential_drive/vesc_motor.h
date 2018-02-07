@@ -29,6 +29,8 @@ public:
 
   void stateCB(const boost::shared_ptr<vesc_msgs::VescStateStamped>& state);
 
+  bool executionCycle();
+
 private:
   double motor_pols_;
 

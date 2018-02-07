@@ -71,6 +71,19 @@ VescDifferntialDrive::VescDifferntialDrive(ros::NodeHandle nh, ros::NodeHandle p
   base_frame_ = private_nh.param<std::string>("base_frame", "/base_link");
 
   cmd_vel_sub_ = nh_.subscribe("/cmd_vel", 1, &VescDifferntialDrive::commandVelocityCB, this);
+
+  // create a 50Hz timer, used for state machine & polling VESC telemetry
+  timer_ = nh.createTimer(ros::Duration(1.0 / 20.0), &VescDifferntialDrive::timerCB, this);
+}
+
+void VescDifferntialDrive::timerCB(const ros::TimerEvent& /*event*/)
+{
+  if(!left_motor_.executionCycle() || !right_motor_.executionCycle())
+  {
+    ROS_FATAL("driver encoutered fault in execution cycle");
+    timer_.stop();
+    ros::shutdown();
+  }
 }
 
 void VescDifferntialDrive::leftMotorSpeed(const double& speed, const ros::Time &time)
@@ -95,8 +108,8 @@ void VescDifferntialDrive::commandVelocityCB(const geometry_msgs::Twist &cmd_vel
   const double left_velocity = (linear_velocity - angular_velocity * track_width_ / 2.) * velocity_correction_left_;
   const double right_velocity = (linear_velocity + angular_velocity * track_width_ / 2.) * velocity_correction_right_;
 
-  const double left_rpm = left_velocity * 2. / wheel_diameter_;
-  const double right_rpm = right_velocity * 2. / wheel_diameter_;
+  const double left_rpm = left_velocity / (M_PI * wheel_diameter_) * 60.;
+  const double right_rpm = right_velocity / (M_PI * wheel_diameter_) * 60.;
 
   left_motor_.sendRpms(left_rpm);
   right_motor_.sendRpms(right_rpm);
@@ -107,8 +120,12 @@ void VescDifferntialDrive::updateOdometry(const ros::Time time)
   if (!has_right_motor_speed_ || !has_left_motor_speed_)
     return;
 
-  const double left_velocity = left_motor_speed_ * wheel_diameter_ / 2. / velocity_correction_left_;
-  const double right_velocity = right_motor_speed_ * wheel_diameter_ / 2. / velocity_correction_right_;
+  ROS_INFO_STREAM("left_motor_speed: " << left_motor_speed_ << " right_motor_speed: " << right_motor_speed_);
+
+  const double left_velocity = left_motor_speed_ * M_PI * wheel_diameter_ / 60. / velocity_correction_left_;
+  const double right_velocity = right_motor_speed_ * M_PI * wheel_diameter_ / 60. / velocity_correction_right_;
+
+  ROS_INFO_STREAM("left_velocity: " << left_velocity << " right_velocity: " << right_velocity);
 
   if (!std::isfinite(left_velocity) || !std::isfinite(right_velocity))
   {

@@ -35,7 +35,7 @@ void VescMotor::servoSensorCB(const boost::shared_ptr<std_msgs::Float64>& /*serv
 
 void VescMotor::stateCB(const boost::shared_ptr<vesc_msgs::VescStateStamped>& state)
 {
-  speed_handler_function_(state->state.speed, state->header.stamp);
+  speed_handler_function_(state->state.speed / motor_pols_, state->header.stamp);
 }
 
 void VescMotor::run()
@@ -46,10 +46,17 @@ void VescMotor::run()
     while (!send_rpms_)
       write_buffer_condition_.wait(write_lock);
 
-    std_msgs::Float64 motor_speed;
-    motor_speed.data = buffered_rpms_ * motor_pols_;
-    driver_.setSpeed(std_msgs::Float64::ConstPtr(&motor_speed));
+    ROS_INFO_STREAM("buffered_rpms: " << buffered_rpms_);
+
+    std_msgs::Float64::Ptr motor_speed(new std_msgs::Float64());
+    motor_speed->data = buffered_rpms_ * motor_pols_;
+    driver_.setSpeed(motor_speed);
     send_rpms_ = false;
   }
+}
+
+bool VescMotor::executionCycle()
+{
+  return driver_.executionCycle();
 }
 }

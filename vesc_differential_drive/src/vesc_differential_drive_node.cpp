@@ -12,7 +12,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "vesc_driver_node");
+  ros::init(argc, argv, "vesc_differential_drive");
   ros::NodeHandle nh;
   ros::NodeHandle private_nh("~");
   ros::NodeHandle left_motor_private_nh("~/left_motor");
