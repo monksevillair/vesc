@@ -101,26 +101,32 @@ class VescPacketValues : public VescPacket
 public:
   VescPacketValues(boost::shared_ptr<VescFrame> raw);
 
-  double v_in() const;
-  double temp_mos1() const;
-  double temp_mos2() const;
-  double temp_mos3() const;
-  double temp_mos4() const;
-  double temp_mos5() const;
-  double temp_mos6() const;
-  double temp_pcb() const;
+  double temp_mos() const;
+  double temp_motor() const;
   double current_motor() const;
   double current_in() const;
-  double rpm() const;
+  double id() const;
+  double iq() const;
   double duty_now() const;
+  double rpm() const;
+  double v_in() const;
   double amp_hours() const;
   double amp_hours_charged() const;
   double watt_hours() const;
   double watt_hours_charged() const;
-  double tachometer() const;
-  double tachometer_abs() const;
-  int fault_code() const;
+  int32_t tachometer() const;
+  int32_t tachometer_abs() const;
+  int8_t fault_code() const;
 
+private:
+  int8_t getInt8Bit(size_t offset) const;
+
+  int16_t getInt16Bit(size_t offset) const;
+
+  int32_t getInt32Bit(size_t offset) const;
+
+  double getDouble16Bit(size_t offset) const;
+  double getDouble32Bit(size_t offset) const;
 };
 
 class VescPacketRequestValues : public VescPacket
