@@ -11,7 +11,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_differntial_drive
 {
-VescMotor::VescMotor(const ros::NodeHandle &private_nh,
+VescMotor::VescMotor(ros::NodeHandle private_nh,
                      const SpeedHandlerFunction &speed_handler_function)
 : send_rpms_(false), write_thread_(boost::bind(&VescMotor::run, this)),
   speed_handler_function_(speed_handler_function), driver_(private_nh,
@@ -20,6 +20,8 @@ VescMotor::VescMotor(const ros::NodeHandle &private_nh,
 {
   if (!private_nh.getParam("motor_pols", motor_pols_))
     throw std::invalid_argument("motor pols are not defined");
+
+  invert_direction_ = private_nh.param<bool>("invert_direction", false);
 }
 
 void VescMotor::sendRpms(double rpm)
@@ -35,7 +37,7 @@ void VescMotor::servoSensorCB(const boost::shared_ptr<std_msgs::Float64>& /*serv
 
 void VescMotor::stateCB(const boost::shared_ptr<vesc_msgs::VescStateStamped>& state)
 {
-  speed_handler_function_(state->state.speed / motor_pols_, state->header.stamp);
+  speed_handler_function_(state->state.speed / motor_pols_ * (invert_direction_ ? -1. : 1.), state->header.stamp);
 }
 
 void VescMotor::run()
@@ -49,7 +51,7 @@ void VescMotor::run()
     ROS_INFO_STREAM("buffered_rpms: " << buffered_rpms_);
 
     std_msgs::Float64::Ptr motor_speed(new std_msgs::Float64());
-    motor_speed->data = buffered_rpms_ * motor_pols_;
+    motor_speed->data = buffered_rpms_ * motor_pols_ * (invert_direction_ ? -1. : 1.);
     driver_.setSpeed(motor_speed);
     send_rpms_ = false;
   }

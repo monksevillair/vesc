@@ -21,7 +21,7 @@ class VescMotor
 public:
   typedef boost::function<void (const double&, const ros::Time& time)> SpeedHandlerFunction;
 
-  VescMotor(const ros::NodeHandle &private_nh, const SpeedHandlerFunction& speed_handler_function);
+  VescMotor(ros::NodeHandle private_nh, const SpeedHandlerFunction& speed_handler_function);
 
   void sendRpms(double rpm);
 
@@ -33,6 +33,8 @@ public:
 
 private:
   double motor_pols_;
+
+  bool invert_direction_;
 
   boost::mutex write_buffer_mutex_;
   boost::condition_variable write_buffer_condition_;
