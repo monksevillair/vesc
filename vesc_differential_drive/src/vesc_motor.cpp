@@ -48,7 +48,7 @@ void VescMotor::run()
     while (!send_rpms_)
       write_buffer_condition_.wait(write_lock);
 
-    ROS_INFO_STREAM("buffered_rpms: " << buffered_rpms_);
+    ROS_DEBUG_STREAM("buffered_rpms: " << buffered_rpms_);
 
     std_msgs::Float64::Ptr motor_speed(new std_msgs::Float64());
     motor_speed->data = buffered_rpms_ * motor_pols_ * (invert_direction_ ? -1. : 1.);

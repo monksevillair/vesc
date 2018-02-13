@@ -69,7 +69,7 @@ void* VescInterface::Impl::rxThread(void)
           VescPacketConstPtr packet =
             VescPacketFactory::createPacket(iter, buffer.end(), &bytes_needed, &error);
           if (packet) {
-            std::cout << "received packge of size " << buffer.size() << std::endl;
+            // std::cout << "received packge of size " << buffer.size() << std::endl;
             // good packet, check if we skipped any data
             if (std::distance(iter_begin, iter) > 0) {
               std::ostringstream ss;
@@ -209,14 +209,25 @@ bool VescInterface::isConnected() const
 void VescInterface::send(const VescPacket& packet)
 {
   boost::mutex::scoped_lock send_lock(send_mutex_);
-  if (packet.frame().size() > 6)
+  try
   {
-    std::cout << "send packet of size: " << packet.frame().size() << std::endl;
+//  if (packet.frame().size() > 6)
+//  {
+//    std::cout << "send packet of size: " << packet.frame().size() << std::endl;
+//  }
+    size_t written = impl_->serial_.write(packet.frame());
+    if (written != packet.frame().size())
+    {
+      std::stringstream ss;
+      ss << "Wrote " << written << " bytes, expected " << packet.frame().size() << ".";
+      throw SerialException(ss.str().c_str());
+    }
   }
-  size_t written = impl_->serial_.write(packet.frame());
-  if (written != packet.frame().size()) {
+  catch (const std::exception& e) {
+    send_lock.unlock();
+    disconnect();
     std::stringstream ss;
-    ss << "Wrote " << written << " bytes, expected " << packet.frame().size() << ".";
+    ss << "Failed writing to VESC. " << e.what();
     throw SerialException(ss.str().c_str());
   }
 }

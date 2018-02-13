@@ -120,12 +120,12 @@ void VescDifferntialDrive::updateOdometry(const ros::Time time)
   if (!has_right_motor_speed_ || !has_left_motor_speed_)
     return;
 
-  ROS_INFO_STREAM("left_motor_speed: " << left_motor_speed_ << " right_motor_speed: " << right_motor_speed_);
+  ROS_DEBUG_STREAM("left_motor_speed: " << left_motor_speed_ << " right_motor_speed: " << right_motor_speed_);
 
   const double left_velocity = left_motor_speed_ * M_PI * wheel_diameter_ / 60. / velocity_correction_left_;
   const double right_velocity = right_motor_speed_ * M_PI * wheel_diameter_ / 60. / velocity_correction_right_;
 
-  ROS_INFO_STREAM("left_velocity: " << left_velocity << " right_velocity: " << right_velocity);
+  ROS_DEBUG_STREAM("left_velocity: " << left_velocity << " right_velocity: " << right_velocity);
 
   if (!std::isfinite(left_velocity) || !std::isfinite(right_velocity))
   {
