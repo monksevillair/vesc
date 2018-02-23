@@ -10,13 +10,15 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <vesc_differential_drive/vesc_differntial_drive.h>
 #include <nav_msgs/Odometry.h>
 #include <angles/angles.h>
+#include <std_msgs/Float32.h>
 
 namespace vesc_differntial_drive
 {
 VescDifferntialDrive::VescDifferntialDrive(ros::NodeHandle nh, ros::NodeHandle private_nh,
                                            const ros::NodeHandle &left_motor_private_nh,
                                            const ros::NodeHandle &right_motor_private_nh)
-: nh_(nh), left_motor_(left_motor_private_nh, boost::bind(&VescDifferntialDrive::leftMotorSpeed, this, _1, _2)),
+: nh_(nh), left_motor_(left_motor_private_nh, boost::bind(&VescDifferntialDrive::leftMotorSpeed, this, _1, _2),
+                       boost::bind(&VescDifferntialDrive::batteryVoltage, this, _1)),
   has_left_motor_speed_(false),
   right_motor_(right_motor_private_nh, boost::bind(&VescDifferntialDrive::rightMotorSpeed, this, _1, _2)),
   has_right_motor_speed_(false), linear_velocity_odom_(0.), angular_velocity_odom_(0.), x_odom_(0.), y_odom_(0.),
@@ -72,8 +74,12 @@ VescDifferntialDrive::VescDifferntialDrive(ros::NodeHandle nh, ros::NodeHandle p
 
   cmd_vel_sub_ = nh_.subscribe("/cmd_vel", 1, &VescDifferntialDrive::commandVelocityCB, this);
 
-  // create a 50Hz timer, used for state machine & polling VESC telemetry
-  timer_ = nh.createTimer(ros::Duration(1.0 / 20.0), &VescDifferntialDrive::timerCB, this);
+  double odometry_time_frequency = private_nh.param<double>("odometry_time_frequency", 10.);
+
+  // create a 20Hz timer, used for state machine & polling VESC telemetry
+  timer_ = nh.createTimer(ros::Duration(1.0 / (odometry_time_frequency / 2.)), &VescDifferntialDrive::timerCB, this);
+
+  battery_voltage_pub_ = nh_.advertise<std_msgs::Float32>("/battery_voltage", 1);
 }
 
 void VescDifferntialDrive::timerCB(const ros::TimerEvent& /*event*/)
@@ -98,6 +104,14 @@ void VescDifferntialDrive::rightMotorSpeed(const double& speed, const ros::Time 
   updateOdometry(time);
   has_right_motor_speed_ = true;
   right_motor_speed_ = speed;
+}
+
+void VescDifferntialDrive::batteryVoltage(const double& voltage)
+{
+  std_msgs::Float32 battery_voltage_msg;
+  battery_voltage_msg.data = voltage;
+
+  battery_voltage_pub_.publish(battery_voltage_msg);
 }
 
 void VescDifferntialDrive::commandVelocityCB(const geometry_msgs::Twist &cmd_vel)

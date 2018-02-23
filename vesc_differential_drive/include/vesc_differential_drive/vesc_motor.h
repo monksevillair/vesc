@@ -20,8 +20,10 @@ class VescMotor
 {
 public:
   typedef boost::function<void (const double&, const ros::Time& time)> SpeedHandlerFunction;
+  typedef boost::function<void (const double&)> VoltageHandlerFunction;
 
-  VescMotor(ros::NodeHandle private_nh, const SpeedHandlerFunction& speed_handler_function);
+  VescMotor(ros::NodeHandle private_nh, const SpeedHandlerFunction& speed_handler_function,
+            const VoltageHandlerFunction& voltage_handler_function = VoltageHandlerFunction());
 
   void sendRpms(double rpm);
 
@@ -43,6 +45,7 @@ private:
   boost::thread write_thread_;
 
   SpeedHandlerFunction speed_handler_function_;
+  VoltageHandlerFunction voltage_handler_function_;
 
   vesc_driver::VescDriver driver_;
 

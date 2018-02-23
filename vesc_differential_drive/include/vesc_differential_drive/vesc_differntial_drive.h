@@ -26,6 +26,8 @@ public:
 
   void rightMotorSpeed(const double& speed, const ros::Time &time);
 
+  void batteryVoltage(const double& voltage);
+
   void commandVelocityCB(const geometry_msgs::Twist &cmd_vel);
 
 private:
@@ -63,6 +65,8 @@ private:
 
   bool publish_tf_;
   tf::TransformBroadcaster tf_broadcaster_;
+
+  ros::Publisher battery_voltage_pub_;
 
   ros::Subscriber cmd_vel_sub_;
 

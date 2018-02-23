@@ -12,11 +12,13 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 namespace vesc_differntial_drive
 {
 VescMotor::VescMotor(ros::NodeHandle private_nh,
-                     const SpeedHandlerFunction &speed_handler_function)
+                     const SpeedHandlerFunction &speed_handler_function,
+                     const VoltageHandlerFunction& voltage_handler_function)
 : send_rpms_(false), write_thread_(boost::bind(&VescMotor::run, this)),
-  speed_handler_function_(speed_handler_function), driver_(private_nh,
-                                                           boost::bind(&VescMotor::servoSensorCB, this, _1),
-                                                           boost::bind(&VescMotor::stateCB, this, _1))
+  speed_handler_function_(speed_handler_function), voltage_handler_function_(voltage_handler_function),
+  driver_(private_nh,
+          boost::bind(&VescMotor::servoSensorCB, this, _1),
+          boost::bind(&VescMotor::stateCB, this, _1))
 {
   if (!private_nh.getParam("motor_pols", motor_pols_))
     throw std::invalid_argument("motor pols are not defined");
@@ -38,6 +40,9 @@ void VescMotor::servoSensorCB(const boost::shared_ptr<std_msgs::Float64>& /*serv
 void VescMotor::stateCB(const boost::shared_ptr<vesc_msgs::VescStateStamped>& state)
 {
   speed_handler_function_(state->state.speed / motor_pols_ * (invert_direction_ ? -1. : 1.), state->header.stamp);
+
+  if (!voltage_handler_function_.empty())
+    voltage_handler_function_(state->state.voltage_input);
 }
 
 void VescMotor::run()
