@@ -5,15 +5,15 @@ find_package(catkin REQUIRED COMPONENTS
   nodelet
   pluginlib
   roscpp
+  serial
   std_msgs
   vesc_msgs
-  serial
 )
 
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS nodelet pluginlib roscpp std_msgs vesc_msgs serial
-  LIBRARIES vesc_driver
+  CATKIN_DEPENDS nodelet pluginlib roscpp serial std_msgs vesc_msgs
+  LIBRARIES ${PROJECT_NAME} ${PROJECT_NAME}_ros
 )
 
 ###########
@@ -26,58 +26,62 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_library(vesc_driver src/vesc_driver.cpp
-                        src/vesc_interface.cpp
-                        src/vesc_packet.cpp
-                        src/vesc_packet_factory.cpp
-)
-target_link_libraries(vesc_driver
-        ${catkin_LIBRARIES}
+add_library(${PROJECT_NAME}
+  include/${PROJECT_NAME}/datatypes.h
+  include/${PROJECT_NAME}/v8stdint.h
+  src/vesc_driver.cpp include/${PROJECT_NAME}/vesc_driver.h
+  src/vesc_interface.cpp include/${PROJECT_NAME}/vesc_interface.h
+  src/vesc_packet.cpp include/${PROJECT_NAME}/vesc_packet.h
+  src/vesc_packet_factory.cpp include/${PROJECT_NAME}/vesc_packet_factory.h
 )
 
-add_library(vesc_ros_driver src/vesc_ros_driver.cpp
+target_link_libraries(${PROJECT_NAME}
+  ${catkin_LIBRARIES}
 )
-target_link_libraries(vesc_ros_driver
-        ${catkin_LIBRARIES}
-        vesc_driver
+
+add_dependencies(${PROJECT_NAME}
+  ${catkin_EXPORTED_TARGETS}
+)
+
+add_library(${PROJECT_NAME}_ros
+  src/vesc_ros_driver.cpp include/${PROJECT_NAME}/vesc_ros_driver.h
+)
+
+target_link_libraries(${PROJECT_NAME}_ros
+  ${PROJECT_NAME}
+  ${catkin_LIBRARIES}
 )
 
 # node executable
-add_executable(vesc_driver_node src/vesc_driver_node.cpp
+add_executable(${PROJECT_NAME}_node
+  src/vesc_driver_node.cpp
 )
-add_dependencies(vesc_driver_node ${catkin_EXPORTED_TARGETS})
-target_link_libraries(vesc_driver_node
+
+target_link_libraries(${PROJECT_NAME}_node
+  ${PROJECT_NAME}_ros
   ${catkin_LIBRARIES}
-  vesc_ros_driver
 )
 
 # nodelet library
-add_library(vesc_driver_nodelet src/vesc_driver_nodelet.cpp
+add_library(${PROJECT_NAME}_nodelet
+  src/vesc_driver_nodelet.cpp
 )
-add_dependencies(vesc_driver_nodelet ${catkin_EXPORTED_TARGETS})
-target_link_libraries(vesc_driver_nodelet
+
+target_link_libraries(${PROJECT_NAME}_nodelet
+  ${PROJECT_NAME}_ros
   ${catkin_LIBRARIES}
-  vesc_ros_driver
 )
 
 #############
 ## Install ##
 #############
 
-install(TARGETS vesc_driver
+install(TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_ros ${PROJECT_NAME}_nodelet
         LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 )
 
-install(TARGETS vesc_ros_driver
-        LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-)
-
-install(TARGETS vesc_driver_node
+install(TARGETS ${PROJECT_NAME}_node
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-
-install(TARGETS vesc_driver_nodelet
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 )
 
 install(DIRECTORY include/${PROJECT_NAME}/
