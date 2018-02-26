@@ -163,7 +163,7 @@ void VescDriver::setBrake(const std_msgs::Float64::ConstPtr& brake)
 void VescDriver::setSpeed(const std_msgs::Float64::ConstPtr& speed)
 {
   if (isInOperationMode()) {
-    ROS_INFO_STREAM("setSpeed: " << speed->data);
+    ROS_DEBUG_STREAM("setSpeed: " << speed->data);
     vesc_.setSpeed(speed_limit_.clip(speed->data));
   }
 }
