@@ -134,67 +134,67 @@ double VescPacketValues::getDouble32Bit(size_t offset) const
 
 double VescPacketValues::temp_mos() const
 {
-  return getDouble16Bit(1) * 1e1;
+  return getDouble16Bit(1) / 1e1;
 }
 
 double VescPacketValues::temp_motor() const
 {
-  return getDouble16Bit(3) * 1e1;
+  return getDouble16Bit(3) / 1e1;
 }
 
 double VescPacketValues::current_motor() const
 {
-  return getDouble32Bit(5) * 1e2;
+  return getDouble32Bit(5) / 1e2;
 }
 
 double VescPacketValues::current_in() const
 {
-  return getDouble32Bit(9) * 1e2;
+  return getDouble32Bit(9) / 1e2;
 }
 
 double VescPacketValues::id() const
 {
-  return getDouble32Bit(13) * 1e2;
+  return getDouble32Bit(13) / 1e2;
 }
 
 double VescPacketValues::iq() const
 {
-  return getDouble32Bit(17) * 1e2;
+  return getDouble32Bit(17) / 1e2;
 }
 
 double VescPacketValues::duty_now() const
 {
-  return getDouble16Bit(21) * 1e3;
+  return getDouble16Bit(21) / 1e3;
 }
 
 double VescPacketValues::rpm() const
 {
-  return getDouble32Bit(23) * 1e0;
+  return getDouble32Bit(23) / 1e0;
 }
 
 double VescPacketValues::v_in() const
 {
-  return getDouble16Bit(27) * 1e1;
+  return getDouble16Bit(27) / 1e1;
 }
 
 double VescPacketValues::amp_hours() const
 {
-  return getDouble32Bit(29) * 1e4;
+  return getDouble32Bit(29) / 1e4;
 }
 
 double VescPacketValues::amp_hours_charged() const
 {
-  return getDouble32Bit(33) * 1e4;
+  return getDouble32Bit(33) / 1e4;
 }
 
 double VescPacketValues::watt_hours() const
 {
-  return getDouble32Bit(37) * 1e4;
+  return getDouble32Bit(37) / 1e4;
 }
 
 double VescPacketValues::watt_hours_charged() const
 {
-  return getDouble32Bit(41) * 1e4;
+  return getDouble32Bit(41) / 1e4;
 }
 
 int32_t VescPacketValues::tachometer() const
