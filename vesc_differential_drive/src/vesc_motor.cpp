@@ -34,6 +34,14 @@ void VescMotor::sendRpms(double rpm)
   write_buffer_condition_.notify_all();
 }
 
+void VescMotor::brake(double current)
+{
+  boost::mutex::scoped_lock write_lock(write_buffer_mutex_);
+  buffered_brake_current_ = current;
+  send_brake_ = true;
+  write_buffer_condition_.notify_all();
+}
+
 void VescMotor::servoSensorCB(const boost::shared_ptr<std_msgs::Float64>& /*servo_sensor_value*/)
 { }
 
@@ -50,15 +58,27 @@ void VescMotor::run()
   while(ros::ok())
   {
     boost::mutex::scoped_lock write_lock(write_buffer_mutex_);
-    while (!send_rpms_)
+    while (!send_rpms_ && !send_brake_)
       write_buffer_condition_.wait(write_lock);
 
-    ROS_DEBUG_STREAM("buffered_rpms: " << buffered_rpms_);
+    if (send_rpms_)
+    {
+      ROS_DEBUG_STREAM("buffered_rpms: " << buffered_rpms_);
 
-    std_msgs::Float64::Ptr motor_speed(new std_msgs::Float64());
-    motor_speed->data = buffered_rpms_ * motor_pols_ * (invert_direction_ ? -1. : 1.);
-    driver_.setSpeed(motor_speed);
-    send_rpms_ = false;
+      std_msgs::Float64::Ptr motor_speed(new std_msgs::Float64());
+      motor_speed->data = buffered_rpms_ * motor_pols_ * (invert_direction_ ? -1. : 1.);
+      driver_.setSpeed(motor_speed);
+      send_rpms_ = false;
+    }
+    else if(send_brake_)
+    {
+      ROS_DEBUG_STREAM("buffered_brake_current: " << buffered_brake_current_);
+
+      std_msgs::Float64::Ptr brake_current(new std_msgs::Float64());
+      brake_current->data = buffered_brake_current_;
+      driver_.setBrake(brake_current);
+      send_brake_ = false;
+    }
   }
 }
 

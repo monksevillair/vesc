@@ -48,6 +48,10 @@ private:
   double velocity_correction_right_;
   double wheel_diameter_;
 
+  double allowed_brake_rpms_;
+  double brake_rpms_;
+  double brake_current_;
+
   ros::Time odom_update_time_;
 
   double linear_velocity_odom_;

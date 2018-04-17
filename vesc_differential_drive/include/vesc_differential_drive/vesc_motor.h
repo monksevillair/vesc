@@ -27,6 +27,8 @@ public:
 
   void sendRpms(double rpm);
 
+  void brake(double current);
+
   void servoSensorCB(const boost::shared_ptr<std_msgs::Float64>& servo_sensor_value);
 
   void stateCB(const boost::shared_ptr<vesc_msgs::VescStateStamped>& state);
@@ -43,6 +45,9 @@ private:
   bool send_rpms_;
   double buffered_rpms_;
   boost::thread write_thread_;
+
+  bool send_brake_;
+  double buffered_brake_current_;
 
   SpeedHandlerFunction speed_handler_function_;
   VoltageHandlerFunction voltage_handler_function_;

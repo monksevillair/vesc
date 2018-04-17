@@ -61,6 +61,39 @@ VescDifferntialDrive::VescDifferntialDrive(ros::NodeHandle nh, ros::NodeHandle p
   velocity_correction_left_ = private_nh.param<double>("velocity_correction_left", 1.0);
   velocity_correction_right_ = private_nh.param<double>("velocity_correction_right", 1.0);
 
+  if (!private_nh.getParam("allowed_brake_rpms", allowed_brake_rpms_))
+  {
+    ROS_ERROR("can't get paramter allowed_brake_rpms");
+    throw std::invalid_argument("can't get paramter");
+  }
+  if (allowed_brake_rpms_ < 0.)
+  {
+    ROS_ERROR("allowed_brake_rpms is negative");
+    throw std::invalid_argument("wrong range of paramter");
+  }
+
+  if (!private_nh.getParam("brake_rpms", brake_rpms_))
+  {
+    ROS_ERROR("can't get paramter brake_rpms");
+    throw std::invalid_argument("can't get paramter");
+  }
+  if (brake_rpms_ < 0.)
+  {
+    ROS_ERROR("brake_rpms is negative");
+    throw std::invalid_argument("wrong range of paramter");
+  }
+
+  if (!private_nh.getParam("brake_current", brake_current_))
+  {
+    ROS_ERROR("can't get paramter brake_current");
+    throw std::invalid_argument("can't get paramter");
+  }
+  if (brake_rpms_ < 0.)
+  {
+    ROS_ERROR("brake_current is negative");
+    throw std::invalid_argument("wrong range of paramter");
+  }
+
   publish_odom_ = private_nh.param<bool>("publish_odom", true);
   if (publish_odom_)
   {
@@ -125,8 +158,17 @@ void VescDifferntialDrive::commandVelocityCB(const geometry_msgs::Twist &cmd_vel
   const double left_rpm = left_velocity / (M_PI * wheel_diameter_) * 60.;
   const double right_rpm = right_velocity / (M_PI * wheel_diameter_) * 60.;
 
-  left_motor_.sendRpms(left_rpm);
-  right_motor_.sendRpms(right_rpm);
+  if ((left_rpm <= brake_rpms_) && (right_rpm <= brake_rpms_) &&
+    (left_motor_speed_ <= allowed_brake_rpms_) && (right_motor_speed_ <= allowed_brake_rpms_))
+  {
+    left_motor_.brake(brake_current_);
+    right_motor_.brake(brake_current_);
+  }
+  else
+  {
+    left_motor_.sendRpms(left_rpm);
+    right_motor_.sendRpms(right_rpm);
+  }
 }
 
 void VescDifferntialDrive::updateOdometry(const ros::Time time)
