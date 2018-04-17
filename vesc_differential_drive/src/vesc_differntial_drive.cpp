@@ -158,9 +158,11 @@ void VescDifferntialDrive::commandVelocityCB(const geometry_msgs::Twist &cmd_vel
   const double left_rpm = left_velocity / (M_PI * wheel_diameter_) * 60.;
   const double right_rpm = right_velocity / (M_PI * wheel_diameter_) * 60.;
 
-  if ((left_rpm <= brake_rpms_) && (right_rpm <= brake_rpms_) &&
-    (left_motor_speed_ <= allowed_brake_rpms_) && (right_motor_speed_ <= allowed_brake_rpms_))
+  if ((std::fabs(left_rpm) <= brake_rpms_) && (std::fabs(right_rpm) <= brake_rpms_) &&
+    (std::fabs(left_motor_speed_) <= allowed_brake_rpms_) && (std::fabs(right_motor_speed_) <= allowed_brake_rpms_))
   {
+    ROS_DEBUG_STREAM("brake due to left_rpm: " << left_rpm << " right_rpm: " << right_rpm 
+                    << " left_motor_speed: " << left_motor_speed_ << " right_motor_speed: " << right_motor_speed_);
     left_motor_.brake(brake_current_);
     right_motor_.brake(brake_current_);
   }

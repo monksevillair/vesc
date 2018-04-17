@@ -14,7 +14,7 @@ namespace vesc_differntial_drive
 VescMotor::VescMotor(ros::NodeHandle private_nh,
                      const SpeedHandlerFunction &speed_handler_function,
                      const VoltageHandlerFunction& voltage_handler_function)
-: send_rpms_(false), write_thread_(boost::bind(&VescMotor::run, this)),
+: send_rpms_(false), send_brake_(false), write_thread_(boost::bind(&VescMotor::run, this)),
   speed_handler_function_(speed_handler_function), voltage_handler_function_(voltage_handler_function),
   driver_(private_nh,
           boost::bind(&VescMotor::servoSensorCB, this, _1),
