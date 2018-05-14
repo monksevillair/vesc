@@ -31,6 +31,10 @@ public:
   void commandVelocityCB(const geometry_msgs::Twist &cmd_vel);
 
 private:
+  void publishLeftMotorSpeed();
+  void publishRightMotorSpeed();
+  void publishMotorSpeed(const double& speed, ros::Publisher &motor_speed_pub);
+
   ros::NodeHandle nh_;
 
   VescMotor left_motor_;
@@ -71,6 +75,10 @@ private:
   tf::TransformBroadcaster tf_broadcaster_;
 
   ros::Publisher battery_voltage_pub_;
+
+  bool publish_motor_speed_;
+  ros::Publisher left_motor_speed_pub_;
+  ros::Publisher right_motor_speed_pub_;
 
   ros::Subscriber cmd_vel_sub_;
 

@@ -102,6 +102,8 @@ VescDifferntialDrive::VescDifferntialDrive(ros::NodeHandle nh, ros::NodeHandle p
 
   publish_tf_ = private_nh.param<bool>("publish_tf", true);
 
+  publish_motor_speed_ = private_nh.param<bool>("publish_motor_speed", false);
+
   odom_frame_ = private_nh.param<std::string>("odom_frame", "/odom");
   base_frame_ = private_nh.param<std::string>("base_frame", "/base_link");
 
@@ -113,6 +115,9 @@ VescDifferntialDrive::VescDifferntialDrive(ros::NodeHandle nh, ros::NodeHandle p
   timer_ = nh.createTimer(ros::Duration(1.0 / (odometry_time_frequency / 2.)), &VescDifferntialDrive::timerCB, this);
 
   battery_voltage_pub_ = nh_.advertise<std_msgs::Float32>("/battery_voltage", 1);
+
+  left_motor_speed_pub_ = nh_.advertise<std_msgs::Float32>("/left_motor_speed", 1);
+  right_motor_speed_pub_ = nh_.advertise<std_msgs::Float32>("/right_motor_speed", 1);
 }
 
 void VescDifferntialDrive::timerCB(const ros::TimerEvent& /*event*/)
@@ -183,6 +188,12 @@ void VescDifferntialDrive::updateOdometry(const ros::Time time)
   const double left_velocity = left_motor_speed_ * M_PI * wheel_diameter_ / 60. / velocity_correction_left_;
   const double right_velocity = right_motor_speed_ * M_PI * wheel_diameter_ / 60. / velocity_correction_right_;
 
+  if (publish_motor_speed_)
+  {
+    publishLeftMotorSpeed();
+    publishRightMotorSpeed();
+  }
+
   ROS_DEBUG_STREAM("left_velocity: " << left_velocity << " right_velocity: " << right_velocity);
 
   if (!std::isfinite(left_velocity) || !std::isfinite(right_velocity))
@@ -250,6 +261,23 @@ double VescDifferntialDrive::ensurBounds(double value, double max)
 double VescDifferntialDrive::ensurBounds(double value, double min, double max)
 {
   return std::min(std::max(value, min), max);
+}
+
+void VescDifferntialDrive::publishLeftMotorSpeed()
+{
+  publishMotorSpeed(left_motor_speed_, left_motor_speed_pub_);
+}
+
+void VescDifferntialDrive::publishRightMotorSpeed()
+{
+  publishMotorSpeed(right_motor_speed_, right_motor_speed_pub_);
+}
+
+void VescDifferntialDrive::publishMotorSpeed(const double& speed, ros::Publisher &motor_speed_pub)
+{
+  std_msgs::Float32 msg;
+  msg.data = speed;
+  motor_speed_pub.publish(msg);
 }
 
 }
