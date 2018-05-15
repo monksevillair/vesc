@@ -144,16 +144,16 @@ void VescDifferntialDrive::timerCB(const ros::TimerEvent& /*event*/)
 
 void VescDifferntialDrive::leftMotorSpeed(const double& speed, const ros::Time &time)
 {
-  updateOdometry(time);
   has_left_motor_speed_ = true;
   left_motor_speed_ = speed;
+  updateOdometry(time);
 }
 
 void VescDifferntialDrive::rightMotorSpeed(const double& speed, const ros::Time &time)
 {
-  updateOdometry(time);
   has_right_motor_speed_ = true;
   right_motor_speed_ = speed;
+  updateOdometry(time);
 }
 
 void VescDifferntialDrive::batteryVoltage(const double& voltage)
