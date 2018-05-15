@@ -116,8 +116,20 @@ VescDifferntialDrive::VescDifferntialDrive(ros::NodeHandle nh, ros::NodeHandle p
 
   battery_voltage_pub_ = nh_.advertise<std_msgs::Float32>("/battery_voltage", 1);
 
-  left_motor_speed_pub_ = nh_.advertise<std_msgs::Float32>("/left_motor_speed", 1);
-  right_motor_speed_pub_ = nh_.advertise<std_msgs::Float32>("/right_motor_speed", 1);
+  if (publish_motor_speed_)
+  {
+    left_motor_speed_pub_ = nh_.advertise<std_msgs::Float32>("/left_motor_speed", 1);
+    right_motor_speed_pub_ = nh_.advertise<std_msgs::Float32>("/right_motor_speed", 1);
+
+    left_velocity_pub_ = nh_.advertise<std_msgs::Float32>("/left_velocity", 1);
+    right_velocity_pub_ = nh_.advertise<std_msgs::Float32>("/right_velocity", 1);
+
+    left_motor_speed_send_pub_ = nh_.advertise<std_msgs::Float32>("/left_motor_speed_send", 1);
+    right_motor_speed_send_pub_ = nh_.advertise<std_msgs::Float32>("/right_motor_speed_send", 1);
+
+    left_velocity_send_pub_ = nh_.advertise<std_msgs::Float32>("/left_velocity_send", 1);
+    right_velocity_send_pub_ = nh_.advertise<std_msgs::Float32>("/right_velocity_send", 1);
+  }
 }
 
 void VescDifferntialDrive::timerCB(const ros::TimerEvent& /*event*/)
@@ -163,6 +175,12 @@ void VescDifferntialDrive::commandVelocityCB(const geometry_msgs::Twist &cmd_vel
   const double left_rpm = left_velocity / (M_PI * wheel_diameter_) * 60.;
   const double right_rpm = right_velocity / (M_PI * wheel_diameter_) * 60.;
 
+  if (publish_motor_speed_)
+  {
+    publishLeftVelocitySend(left_velocity);
+    publishRightVelocitySend(right_velocity);
+  }
+
   if ((std::fabs(left_rpm) <= brake_rpms_) && (std::fabs(right_rpm) <= brake_rpms_) &&
     (std::fabs(left_motor_speed_) <= allowed_brake_rpms_) && (std::fabs(right_motor_speed_) <= allowed_brake_rpms_))
   {
@@ -175,6 +193,12 @@ void VescDifferntialDrive::commandVelocityCB(const geometry_msgs::Twist &cmd_vel
   {
     left_motor_.sendRpms(left_rpm);
     right_motor_.sendRpms(right_rpm);
+
+    if (publish_motor_speed_)
+    {
+      publishLeftMotorSpeedSend(left_rpm);
+      publishRightMotorSpeedSend(right_rpm);
+    }
   }
 }
 
@@ -192,6 +216,8 @@ void VescDifferntialDrive::updateOdometry(const ros::Time time)
   {
     publishLeftMotorSpeed();
     publishRightMotorSpeed();
+    publishLeftVelocity(left_velocity);
+    publishRightVelocity(right_velocity);
   }
 
   ROS_DEBUG_STREAM("left_velocity: " << left_velocity << " right_velocity: " << right_velocity);
@@ -265,15 +291,45 @@ double VescDifferntialDrive::ensurBounds(double value, double min, double max)
 
 void VescDifferntialDrive::publishLeftMotorSpeed()
 {
-  publishMotorSpeed(left_motor_speed_, left_motor_speed_pub_);
+  publishDoubleValue(left_motor_speed_, left_motor_speed_pub_);
 }
 
 void VescDifferntialDrive::publishRightMotorSpeed()
 {
-  publishMotorSpeed(right_motor_speed_, right_motor_speed_pub_);
+  publishDoubleValue(right_motor_speed_, right_motor_speed_pub_);
 }
 
-void VescDifferntialDrive::publishMotorSpeed(const double& speed, ros::Publisher &motor_speed_pub)
+void VescDifferntialDrive::publishLeftVelocity(const double &speed)
+{
+  publishDoubleValue(speed, left_velocity_pub_);
+}
+
+void VescDifferntialDrive::publishRightVelocity(const double &speed)
+{
+  publishDoubleValue(speed, right_velocity_pub_);
+}
+
+void VescDifferntialDrive::publishLeftMotorSpeedSend(const double &speed)
+{
+  publishDoubleValue(speed, left_motor_speed_send_pub_);
+}
+
+void VescDifferntialDrive::publishRightMotorSpeedSend(const double &speed)
+{
+  publishDoubleValue(speed, right_motor_speed_send_pub_);
+}
+
+void VescDifferntialDrive::publishLeftVelocitySend(const double &speed)
+{
+  publishDoubleValue(speed, left_velocity_send_pub_);
+}
+
+void VescDifferntialDrive::publishRightVelocitySend(const double &speed)
+{
+  publishDoubleValue(speed, right_velocity_send_pub_);
+}
+
+void VescDifferntialDrive::publishDoubleValue(const double& speed, ros::Publisher &motor_speed_pub)
 {
   std_msgs::Float32 msg;
   msg.data = speed;

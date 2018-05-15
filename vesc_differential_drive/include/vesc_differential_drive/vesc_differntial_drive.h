@@ -33,7 +33,15 @@ public:
 private:
   void publishLeftMotorSpeed();
   void publishRightMotorSpeed();
-  void publishMotorSpeed(const double& speed, ros::Publisher &motor_speed_pub);
+  void publishLeftVelocity(const double &speed);
+  void publishRightVelocity(const double &speed);
+
+  void publishLeftMotorSpeedSend(const double &speed);
+  void publishRightMotorSpeedSend(const double &speed);
+  void publishLeftVelocitySend(const double &speed);
+  void publishRightVelocitySend(const double &speed);
+
+  void publishDoubleValue(const double &speed, ros::Publisher &motor_speed_pub);
 
   ros::NodeHandle nh_;
 
@@ -79,6 +87,13 @@ private:
   bool publish_motor_speed_;
   ros::Publisher left_motor_speed_pub_;
   ros::Publisher right_motor_speed_pub_;
+  ros::Publisher left_velocity_pub_;
+  ros::Publisher right_velocity_pub_;
+
+  ros::Publisher left_motor_speed_send_pub_;
+  ros::Publisher right_motor_speed_send_pub_;
+  ros::Publisher left_velocity_send_pub_;
+  ros::Publisher right_velocity_send_pub_;
 
   ros::Subscriber cmd_vel_sub_;
 
