@@ -112,7 +112,7 @@ VescDifferntialDrive::VescDifferntialDrive(ros::NodeHandle nh, ros::NodeHandle p
   double odometry_time_frequency = private_nh.param<double>("odometry_time_frequency", 10.);
 
   // create a 20Hz timer, used for state machine & polling VESC telemetry
-  timer_ = nh.createTimer(ros::Duration(1.0 / (odometry_time_frequency / 2.)), &VescDifferntialDrive::timerCB, this);
+  timer_ = nh.createTimer(ros::Duration(1.0 / odometry_time_frequency), &VescDifferntialDrive::timerCB, this);
 
   battery_voltage_pub_ = nh_.advertise<std_msgs::Float32>("/battery_voltage", 1);
 
