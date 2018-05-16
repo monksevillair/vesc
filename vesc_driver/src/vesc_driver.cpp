@@ -14,10 +14,10 @@ namespace vesc_driver
 VescDriver::VescDriver(ros::NodeHandle private_nh,
                        const ServoSensorHandlerFunction& servo_sensor_handler,
                        const StateHandlerFunction& state_handler) :
+    VescDriverInterface(servo_sensor_handler, state_handler),
   vesc_(std::string(),
         boost::bind(&VescDriver::vescPacketCallback, this, _1),
         boost::bind(&VescDriver::vescErrorCallback, this, _1)),
-  servo_sensor_handler_(servo_sensor_handler), state_handler_(state_handler),
   duty_cycle_limit_(private_nh, "duty_cycle", -1.0, 1.0), current_limit_(private_nh, "current"),
   brake_limit_(private_nh, "brake"), speed_limit_(private_nh, "speed"),
   position_limit_(private_nh, "position"), servo_limit_(private_nh, "servo", 0.0, 1.0),

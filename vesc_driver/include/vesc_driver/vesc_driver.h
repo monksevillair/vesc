@@ -13,16 +13,14 @@
 #include "vesc_driver/vesc_packet.h"
 #include <boost/thread/mutex.hpp>
 #include <vesc_msgs/VescStateStamped.h>
+#include <vesc_driver/vesc_driver_interface.h>
 
 namespace vesc_driver
 {
 
-class VescDriver
+class VescDriver : public VescDriverInterface
 {
 public:
-
-  typedef boost::function<void (const boost::shared_ptr<std_msgs::Float64>&)> ServoSensorHandlerFunction;
-  typedef boost::function<void (const boost::shared_ptr<vesc_msgs::VescStateStamped>&)> StateHandlerFunction;
 
   VescDriver(ros::NodeHandle private_nh,
              const ServoSensorHandlerFunction& servo_sensor_handler = ServoSensorHandlerFunction(),
@@ -33,19 +31,19 @@ public:
    *                   note that the VESC may impose a more restrictive bounds on the range depending
    *                   on its configuration, e.g. absolute value is between 0.05 and 0.95.
    */
-  void setDutyCycle(const std_msgs::Float64::ConstPtr& duty_cycle);
+  void setDutyCycle(const std_msgs::Float64::ConstPtr& duty_cycle) override;
   /**
    * @param current Commanded VESC current in Amps. Any value is accepted by this driver. However,
    *                note that the VESC may impose a more restrictive bounds on the range depending on
    *                its configuration.
    */
-  void setCurrent(const std_msgs::Float64::ConstPtr& current);
+  void setCurrent(const std_msgs::Float64::ConstPtr& current) override;
   /**
    * @param brake Commanded VESC braking current in Amps. Any value is accepted by this driver.
    *              However, note that the VESC may impose a more restrictive bounds on the range
    *              depending on its configuration.
    */
-  void setBrake(const std_msgs::Float64::ConstPtr& brake);
+  void setBrake(const std_msgs::Float64::ConstPtr& brake) override;
 
   /**
    * @param speed Commanded VESC speed in electrical RPM. Electrical RPM is the mechanical RPM
@@ -53,27 +51,24 @@ public:
    *              driver. However, note that the VESC may impose a more restrictive bounds on the
    *              range depending on its configuration.
    */
-  void setSpeed(const std_msgs::Float64::ConstPtr& speed);
+  void setSpeed(const std_msgs::Float64::ConstPtr& speed) override;
   /**
    * @param position Commanded VESC motor position in radians. Any value is accepted by this driver.
    *                 Note that the VESC must be in encoder mode for this command to have an effect.
    */
-  void setPosition(const std_msgs::Float64::ConstPtr& position);
+  void setPosition(const std_msgs::Float64::ConstPtr& position) override;
   /**
    * @param servo Commanded VESC servo output position. Valid range is 0 to 1.
    */
-  void setServo(const std_msgs::Float64::ConstPtr& servo);
+  void setServo(const std_msgs::Float64::ConstPtr& servo) override;
 
-  bool executionCycle();
+  bool executionCycle() override;
 
 private:
   // interface to the VESC
   VescInterface vesc_;
   void vescPacketCallback(const boost::shared_ptr<VescPacket const>& packet);
   void vescErrorCallback(const std::string& error);
-
-  ServoSensorHandlerFunction servo_sensor_handler_;
-  StateHandlerFunction state_handler_;
 
   // limits on VESC commands
   struct CommandLimit
