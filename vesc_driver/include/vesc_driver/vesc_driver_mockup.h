@@ -19,6 +19,7 @@ namespace vesc_driver
 {
   class VescDriverMockup : public VescDriverInterface
   {
+  public:
     VescDriverMockup(const StateHandlerFunction& state_handler = StateHandlerFunction());
 
     /**
