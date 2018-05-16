@@ -8,6 +8,8 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
  */
 
 #include <vesc_differential_drive/vesc_motor.h>
+#include <vesc_driver/vesc_driver.h>
+#include <vesc_driver/vesc_driver_mockup.h>
 
 namespace vesc_differntial_drive
 {
@@ -15,15 +17,21 @@ VescMotor::VescMotor(ros::NodeHandle private_nh,
                      const SpeedHandlerFunction &speed_handler_function,
                      const VoltageHandlerFunction& voltage_handler_function)
 : send_rpms_(false), send_brake_(false), write_thread_(boost::bind(&VescMotor::run, this)),
-  speed_handler_function_(speed_handler_function), voltage_handler_function_(voltage_handler_function),
-  driver_(private_nh,
-          boost::bind(&VescMotor::servoSensorCB, this, _1),
-          boost::bind(&VescMotor::stateCB, this, _1))
+  speed_handler_function_(speed_handler_function), voltage_handler_function_(voltage_handler_function)
 {
   if (!private_nh.getParam("motor_pols", motor_pols_))
     throw std::invalid_argument("motor pols are not defined");
 
   invert_direction_ = private_nh.param<bool>("invert_direction", false);
+
+  bool use_mockup = private_nh.param<bool>("use_mockup", false);
+
+  if (!use_mockup)
+    driver_ = new vesc_driver::VescDriver(private_nh,
+                                          boost::bind(&VescMotor::servoSensorCB, this, _1),
+                                          boost::bind(&VescMotor::stateCB, this, _1));
+  else
+    driver_ = new vesc_driver::VescDriverMockup(boost::bind(&VescMotor::stateCB, this, _1));
 }
 
 void VescMotor::sendRpms(double rpm)
@@ -67,7 +75,7 @@ void VescMotor::run()
 
       std_msgs::Float64::Ptr motor_speed(new std_msgs::Float64());
       motor_speed->data = buffered_rpms_ * motor_pols_ * (invert_direction_ ? -1. : 1.);
-      driver_.setSpeed(motor_speed);
+      driver_->setSpeed(motor_speed);
       send_rpms_ = false;
     }
     else if(send_brake_)
@@ -76,7 +84,7 @@ void VescMotor::run()
 
       std_msgs::Float64::Ptr brake_current(new std_msgs::Float64());
       brake_current->data = buffered_brake_current_;
-      driver_.setBrake(brake_current);
+      driver_->setBrake(brake_current);
       send_brake_ = false;
     }
   }
@@ -84,6 +92,6 @@ void VescMotor::run()
 
 bool VescMotor::executionCycle()
 {
-  return driver_.executionCycle();
+  return driver_->executionCycle();
 }
 }

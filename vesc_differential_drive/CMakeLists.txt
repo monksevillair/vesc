@@ -127,8 +127,8 @@ include_directories(
 
 ## Declare a C++ library
 add_library(${PROJECT_NAME}
-  src/vesc_motor.cpp
-  src/vesc_differntial_drive.cpp
+  src/vesc_motor.cpp include/vesc_differential_drive/vesc_motor.h
+  src/vesc_differntial_drive.cpp include/vesc_differential_drive/vesc_differntial_drive.h
 )
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}

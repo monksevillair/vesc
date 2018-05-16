@@ -10,7 +10,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #ifndef VESC_DIFFERENTIAL_DRIVE_VESCMOTOR_H
 #define VESC_DIFFERENTIAL_DRIVE_VESCMOTOR_H
 
-#include <vesc_driver/vesc_driver.h>
+#include <vesc_driver/vesc_driver_interface.h>
 #include <boost/thread.hpp>
 #include <ros/ros.h>
 
@@ -52,7 +52,7 @@ private:
   SpeedHandlerFunction speed_handler_function_;
   VoltageHandlerFunction voltage_handler_function_;
 
-  vesc_driver::VescDriver driver_;
+  vesc_driver::VescDriverInterface* driver_;
 
   void run();
 };
