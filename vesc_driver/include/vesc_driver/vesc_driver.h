@@ -31,19 +31,19 @@ public:
    *                   note that the VESC may impose a more restrictive bounds on the range depending
    *                   on its configuration, e.g. absolute value is between 0.05 and 0.95.
    */
-  void setDutyCycle(const std_msgs::Float64::ConstPtr& duty_cycle) override;
+  virtual void setDutyCycle(const std_msgs::Float64::ConstPtr& duty_cycle);
   /**
    * @param current Commanded VESC current in Amps. Any value is accepted by this driver. However,
    *                note that the VESC may impose a more restrictive bounds on the range depending on
    *                its configuration.
    */
-  void setCurrent(const std_msgs::Float64::ConstPtr& current) override;
+  virtual void setCurrent(const std_msgs::Float64::ConstPtr& current);
   /**
    * @param brake Commanded VESC braking current in Amps. Any value is accepted by this driver.
    *              However, note that the VESC may impose a more restrictive bounds on the range
    *              depending on its configuration.
    */
-  void setBrake(const std_msgs::Float64::ConstPtr& brake) override;
+  virtual void setBrake(const std_msgs::Float64::ConstPtr& brake);
 
   /**
    * @param speed Commanded VESC speed in electrical RPM. Electrical RPM is the mechanical RPM
@@ -51,18 +51,18 @@ public:
    *              driver. However, note that the VESC may impose a more restrictive bounds on the
    *              range depending on its configuration.
    */
-  void setSpeed(const std_msgs::Float64::ConstPtr& speed) override;
+  virtual void setSpeed(const std_msgs::Float64::ConstPtr& speed);
   /**
    * @param position Commanded VESC motor position in radians. Any value is accepted by this driver.
    *                 Note that the VESC must be in encoder mode for this command to have an effect.
    */
-  void setPosition(const std_msgs::Float64::ConstPtr& position) override;
+  virtual void setPosition(const std_msgs::Float64::ConstPtr& position);
   /**
    * @param servo Commanded VESC servo output position. Valid range is 0 to 1.
    */
-  void setServo(const std_msgs::Float64::ConstPtr& servo) override;
+  virtual void setServo(const std_msgs::Float64::ConstPtr& servo);
 
-  bool executionCycle() override;
+  virtual bool executionCycle();
 
 private:
   // interface to the VESC

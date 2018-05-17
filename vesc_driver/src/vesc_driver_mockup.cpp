@@ -12,7 +12,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 namespace vesc_driver
 {
   VescDriverMockup::VescDriverMockup(const StateHandlerFunction &state_handler) :
-      VescDriverInterface(ServoSensorHandlerFunction(), state_handler),
+      VescDriverInterface(ServoSensorHandlerFunction(), state_handler), send_state_(false),
       state_thread_(boost::bind(&VescDriverMockup::run, this))
   { }
 
@@ -59,6 +59,9 @@ namespace vesc_driver
   {
     boost::mutex::scoped_lock state_lock(state_mutex_);
 
+    while (!send_state_)
+      send_state_condition_.wait(state_lock);
+
     while (ros::ok())
     {
       while (!send_state_)
@@ -72,6 +75,8 @@ namespace vesc_driver
       state_msg->state.fault_code = vesc_msgs::VescState::FAULT_CODE_NONE;
 
       state_handler_(state_msg);
+
+      send_state_ = false;
     }
   }
 }
