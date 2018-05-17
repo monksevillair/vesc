@@ -17,13 +17,9 @@ namespace vesc_differntial_drive
 VescDifferntialDrive::VescDifferntialDrive(ros::NodeHandle nh, ros::NodeHandle private_nh,
                                            const ros::NodeHandle &left_motor_private_nh,
                                            const ros::NodeHandle &right_motor_private_nh)
-: initialized_(false), nh_(nh),
-  left_motor_(left_motor_private_nh, boost::bind(&VescDifferntialDrive::leftMotorSpeed, this, _1, _2),
-              boost::bind(&VescDifferntialDrive::batteryVoltage, this, _1)),
-  has_left_motor_speed_(false),
-  right_motor_(right_motor_private_nh, boost::bind(&VescDifferntialDrive::rightMotorSpeed, this, _1, _2)),
-  has_right_motor_speed_(false), linear_velocity_odom_(0.), angular_velocity_odom_(0.), x_odom_(0.), y_odom_(0.),
-  yaw_odom_(0.)
+: initialized_(false), nh_(nh), left_motor_(left_motor_private_nh), left_motor_speed_(0.),
+  right_motor_(right_motor_private_nh), right_motor_speed_(0.),  linear_velocity_odom_(0.),
+  angular_velocity_odom_(0.), x_odom_(0.), y_odom_(0.), yaw_odom_(0.)
 {
   if (!private_nh.getParam("max_velocity_linear", max_velocity_linear_))
   {
@@ -112,8 +108,9 @@ VescDifferntialDrive::VescDifferntialDrive(ros::NodeHandle nh, ros::NodeHandle p
 
   double odometry_time_frequency = private_nh.param<double>("odometry_time_frequency", 10.);
 
-  // create a 20Hz timer, used for state machine & polling VESC telemetry
-  timer_ = nh.createTimer(ros::Duration(1.0 / odometry_time_frequency), &VescDifferntialDrive::timerCB, this);
+  odom_timer_ = nh.createTimer(ros::Duration(1.0 / odometry_time_frequency), &VescDifferntialDrive::odomTimerCB, this);
+  query_timer_ = nh.createTimer(ros::Duration(1.0 / (odometry_time_frequency * 2.1)),
+                                &VescDifferntialDrive::queryTimerCB, this);
 
   battery_voltage_pub_ = nh_.advertise<std_msgs::Float32>("/battery_voltage", 1);
 
@@ -135,7 +132,7 @@ VescDifferntialDrive::VescDifferntialDrive(ros::NodeHandle nh, ros::NodeHandle p
   initialized_ = true;
 }
 
-void VescDifferntialDrive::timerCB(const ros::TimerEvent& /*event*/)
+void VescDifferntialDrive::queryTimerCB(const ros::TimerEvent& /*event*/)
 {
   if (!initialized_)
     return;
@@ -143,38 +140,31 @@ void VescDifferntialDrive::timerCB(const ros::TimerEvent& /*event*/)
   if(!left_motor_.executionCycle() || !right_motor_.executionCycle())
   {
     ROS_FATAL("driver encoutered fault in execution cycle");
-    timer_.stop();
+    odom_timer_.stop();
+    query_timer_.stop();
     ros::shutdown();
   }
 }
 
-void VescDifferntialDrive::leftMotorSpeed(const double& speed, const ros::Time &time)
+void VescDifferntialDrive::odomTimerCB(const ros::TimerEvent& /*event*/)
 {
   if (!initialized_)
     return;
 
-  has_left_motor_speed_ = true;
-  left_motor_speed_ = speed;
-  updateOdometry(time);
+  ros::Time now = ros::Time::now();
+  left_motor_speed_ = left_motor_.getSpeed(now);
+  right_motor_speed_ = right_motor_.getSpeed(now);
+
+  updateOdometry(now);
 }
 
-void VescDifferntialDrive::rightMotorSpeed(const double& speed, const ros::Time &time)
-{
-  if (!initialized_)
-    return;
-
-  has_right_motor_speed_ = true;
-  right_motor_speed_ = speed;
-  updateOdometry(time);
-}
-
-void VescDifferntialDrive::batteryVoltage(const double& voltage)
+void VescDifferntialDrive::voltageTimerCB(const ros::TimerEvent& /*event*/)
 {
   if (!initialized_)
     return;
 
   std_msgs::Float32 battery_voltage_msg;
-  battery_voltage_msg.data = voltage;
+  battery_voltage_msg.data = left_motor_.getVoltage();
 
   battery_voltage_pub_.publish(battery_voltage_msg);
 }
@@ -217,11 +207,8 @@ void VescDifferntialDrive::commandVelocityCB(const geometry_msgs::Twist &cmd_vel
   }
 }
 
-void VescDifferntialDrive::updateOdometry(const ros::Time time)
+void VescDifferntialDrive::updateOdometry(const ros::Time &time)
 {
-  if (!has_right_motor_speed_ || !has_left_motor_speed_)
-    return;
-
   ROS_DEBUG_STREAM("left_motor_speed: " << left_motor_speed_ << " right_motor_speed: " << right_motor_speed_);
 
   const double left_velocity = left_motor_speed_ * M_PI * wheel_diameter_ / 60. / velocity_correction_left_;

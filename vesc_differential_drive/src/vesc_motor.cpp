@@ -13,11 +13,8 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_differntial_drive
 {
-VescMotor::VescMotor(ros::NodeHandle private_nh,
-                     const SpeedHandlerFunction &speed_handler_function,
-                     const VoltageHandlerFunction& voltage_handler_function)
-: speed_handler_function_(speed_handler_function),
-  voltage_handler_function_(voltage_handler_function), driver_(NULL)
+VescMotor::VescMotor(ros::NodeHandle private_nh)
+: driver_(NULL), current_voltage_(-1.)
 {
   if (!private_nh.getParam("motor_pols", motor_pols_))
     throw std::invalid_argument("motor pols are not defined");
@@ -32,6 +29,51 @@ VescMotor::VescMotor(ros::NodeHandle private_nh,
                                           boost::bind(&VescMotor::stateCB, this, _1));
   else
     driver_ = new vesc_driver::VescDriverMockup(boost::bind(&VescMotor::stateCB, this, _1));
+
+  // init kalman filter
+  // [v, a]
+  unsigned int state_size = 2;
+  // [v]
+  unsigned int meas_size = 1;
+  unsigned int contr_size = 0;
+  unsigned short type = CV_32F;
+
+  speed_kf_ = cv::KalmanFilter(state_size, meas_size, contr_size, type);
+  speed_kf_state_ = cv::Mat(state_size, 1, type);
+  speed_kf_measurement_ = cv::Mat(meas_size, 1, type);
+
+  // Transition State Matrix A
+  // Note: set dT at each processing step!
+  // [ 1 dT]
+  // [ 0 1]
+  cv::setIdentity(speed_kf_.transitionMatrix);
+  speed_kf_.transitionMatrix.at<float>(1) = 0.0;
+
+  // Measure Matrix H
+  // [ 1 0]
+  speed_kf_.measurementMatrix = cv::Mat::zeros(meas_size, state_size, type);
+  speed_kf_.measurementMatrix.at<float>(0) = 1.0f; //0 7 16 23
+
+  // Process Noise Covariance Matrix Q
+  // [ Ev 0  ]
+  // [ 0  Ea ]
+  speed_kf_.processNoiseCov.at<float>(0) = 1e-2;
+  speed_kf_.processNoiseCov.at<float>(3) = 1.0f;
+
+  // Measures Noise Covariance Matrix R
+  cv::setIdentity(speed_kf_.measurementNoiseCov, cv::Scalar(1e-1));
+
+  speed_kf_.errorCovPre.at<float>(0) = 1.0;
+  speed_kf_.errorCovPre.at<float>(3) = 1.0;
+
+  speed_kf_measurement_.at<float>(0) = 0.0;
+
+  speed_kf_state_.at<float>(0) = speed_kf_measurement_.at<float>(0);
+  speed_kf_state_.at<float>(1) = 0;
+  speed_kf_state_.at<float>(2) = 0;
+  speed_kf_state_.at<float>(3) = 0;
+
+  speed_kf_.statePost = speed_kf_state_;
 }
 
 void VescMotor::sendRpms(double rpm)
@@ -54,10 +96,18 @@ void VescMotor::servoSensorCB(const boost::shared_ptr<std_msgs::Float64>& /*serv
 
 void VescMotor::stateCB(const boost::shared_ptr<vesc_msgs::VescStateStamped>& state)
 {
-  speed_handler_function_(state->state.speed / motor_pols_ * (invert_direction_ ? -1. : 1.), state->header.stamp);
+  boost::mutex::scoped_lock state_lock(state_mutex_);
 
-  if (!voltage_handler_function_.empty())
-    voltage_handler_function_(state->state.voltage_input);
+  if (predict(state->header.stamp)) // only correct if prediction can be performed
+  {
+    correct(state->state.speed / motor_pols_ * (invert_direction_ ? -1. : 1.));
+  }
+  else
+  {
+    ROS_WARN("skipping state cb due to negative time");
+  }
+
+  current_voltage_ = state->state.voltage_input;
 }
 
 bool VescMotor::executionCycle()
@@ -65,4 +115,51 @@ bool VescMotor::executionCycle()
   boost::mutex::scoped_lock driver_lock(driver_mutex_);
   return driver_->executionCycle();
 }
+
+double VescMotor::getVoltage()
+{
+  boost::mutex::scoped_lock state_lock(state_mutex_);
+  return current_voltage_;
+}
+
+double VescMotor::getSpeed(const ros::Time &time)
+{
+  boost::mutex::scoped_lock state_lock(state_mutex_);
+
+  predict(time);
+
+  return speed_kf_state_.at<float>(0);
+}
+
+bool VescMotor::predict(const ros::Time &time)
+{
+  double dt = 0.;
+
+  if (last_predication_.isValid())
+    dt = (time - last_predication_).toSec();
+
+  bool predicted = false;
+  if (dt > 0.)
+  {
+    speed_kf_.transitionMatrix.at<float>(1) = (float)dt;
+
+    // let the kalman magic happen :P
+    speed_kf_state_ = speed_kf_.predict();
+
+    last_predication_ = time;
+
+    predicted = true;
+  }
+
+  return predicted;
+}
+
+void VescMotor::correct(double speed)
+{
+  speed_kf_measurement_.at<float>(0) = static_cast<float>(speed);
+
+  speed_kf_.correct(speed_kf_measurement_); // Kalman Correction
+}
+
+
 }

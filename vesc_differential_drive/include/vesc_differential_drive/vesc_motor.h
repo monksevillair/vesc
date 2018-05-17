@@ -13,17 +13,15 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <vesc_driver/vesc_driver_interface.h>
 #include <boost/thread.hpp>
 #include <ros/ros.h>
+#include <opencv2/core/core.hpp>
+#include <opencv2/opencv.hpp>
 
 namespace vesc_differntial_drive
 {
 class VescMotor
 {
 public:
-  typedef boost::function<void (const double&, const ros::Time& time)> SpeedHandlerFunction;
-  typedef boost::function<void (const double&)> VoltageHandlerFunction;
-
-  VescMotor(ros::NodeHandle private_nh, const SpeedHandlerFunction& speed_handler_function,
-            const VoltageHandlerFunction& voltage_handler_function = VoltageHandlerFunction());
+  VescMotor(ros::NodeHandle private_nh);
 
   void sendRpms(double rpm);
 
@@ -35,16 +33,29 @@ public:
 
   bool executionCycle();
 
+  double getVoltage();
+
+  double getSpeed(const ros::Time &time);
+
 private:
+  bool predict(const ros::Time &time);
+  void correct(double speed);
+
   double motor_pols_;
 
   bool invert_direction_;
 
-  SpeedHandlerFunction speed_handler_function_;
-  VoltageHandlerFunction voltage_handler_function_;
-
   boost::mutex driver_mutex_;
   vesc_driver::VescDriverInterface* driver_;
+
+  boost::mutex state_mutex_;
+
+  cv::KalmanFilter speed_kf_;
+  ros::Time last_predication_;
+  cv::Mat speed_kf_state_;
+  cv::Mat speed_kf_measurement_;
+
+  double current_voltage_;
 };
 }
 

@@ -22,12 +22,6 @@ public:
   VescDifferntialDrive(ros::NodeHandle nh, ros::NodeHandle private_nh,
                        const ros::NodeHandle &left_motor_private_nh, const ros::NodeHandle &right_motor_private_nh);
 
-  void leftMotorSpeed(const double& speed, const ros::Time &time);
-
-  void rightMotorSpeed(const double& speed, const ros::Time &time);
-
-  void batteryVoltage(const double& voltage);
-
   void commandVelocityCB(const geometry_msgs::Twist &cmd_vel);
 
 private:
@@ -48,11 +42,9 @@ private:
   ros::NodeHandle nh_;
 
   VescMotor left_motor_;
-  bool has_left_motor_speed_;
   double left_motor_speed_;
 
   VescMotor right_motor_;
-  bool has_right_motor_speed_;
   double right_motor_speed_;
 
   double max_velocity_linear_;
@@ -99,11 +91,20 @@ private:
 
   ros::Subscriber cmd_vel_sub_;
 
-  ros::Timer timer_;
+  ros::Timer query_timer_;
 
-  void timerCB(const ros::TimerEvent& event);
+  ros::Timer odom_timer_;
 
-  void updateOdometry(const ros::Time time);
+  ros::Timer voltage_timer_;
+
+
+  void queryTimerCB(const ros::TimerEvent& event);
+
+  void odomTimerCB(const ros::TimerEvent& event);
+
+  void voltageTimerCB(const ros::TimerEvent& event);
+
+  void updateOdometry(const ros::Time &time);
 
   void publishOdom();
 
