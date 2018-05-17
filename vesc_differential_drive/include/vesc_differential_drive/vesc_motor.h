@@ -40,12 +40,6 @@ private:
 
   bool invert_direction_;
 
-  boost::mutex write_buffer_mutex_;
-  boost::condition_variable write_buffer_condition_;
-  bool send_rpms_;
-  double buffered_rpms_;
-  boost::thread write_thread_;
-
   bool send_brake_;
   double buffered_brake_current_;
 
@@ -53,6 +47,12 @@ private:
   VoltageHandlerFunction voltage_handler_function_;
 
   vesc_driver::VescDriverInterface* driver_;
+
+  boost::mutex write_buffer_mutex_;
+  boost::condition_variable write_buffer_condition_;
+  bool send_rpms_;
+  double buffered_rpms_;
+  boost::thread write_thread_;
 
   void run();
 };

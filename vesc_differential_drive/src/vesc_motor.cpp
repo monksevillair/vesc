@@ -16,8 +16,9 @@ namespace vesc_differntial_drive
 VescMotor::VescMotor(ros::NodeHandle private_nh,
                      const SpeedHandlerFunction &speed_handler_function,
                      const VoltageHandlerFunction& voltage_handler_function)
-: send_rpms_(false), send_brake_(false), write_thread_(boost::bind(&VescMotor::run, this)),
-  speed_handler_function_(speed_handler_function), voltage_handler_function_(voltage_handler_function)
+: send_rpms_(false), send_brake_(false), speed_handler_function_(speed_handler_function),
+  voltage_handler_function_(voltage_handler_function), driver_(NULL),
+  write_thread_(boost::bind(&VescMotor::run, this))
 {
   if (!private_nh.getParam("motor_pols", motor_pols_))
     throw std::invalid_argument("motor pols are not defined");
@@ -66,7 +67,7 @@ void VescMotor::run()
   while(ros::ok())
   {
     boost::mutex::scoped_lock write_lock(write_buffer_mutex_);
-    while (!send_rpms_ && !send_brake_)
+    while (!send_rpms_ && !send_brake_ && !driver_)
       write_buffer_condition_.wait(write_lock);
 
     if (send_rpms_)

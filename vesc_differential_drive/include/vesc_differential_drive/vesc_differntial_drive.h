@@ -43,6 +43,8 @@ private:
 
   void publishDoubleValue(const double &speed, ros::Publisher &motor_speed_pub);
 
+  bool initialized_;
+
   ros::NodeHandle nh_;
 
   VescMotor left_motor_;

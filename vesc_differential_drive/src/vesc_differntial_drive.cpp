@@ -17,8 +17,9 @@ namespace vesc_differntial_drive
 VescDifferntialDrive::VescDifferntialDrive(ros::NodeHandle nh, ros::NodeHandle private_nh,
                                            const ros::NodeHandle &left_motor_private_nh,
                                            const ros::NodeHandle &right_motor_private_nh)
-: nh_(nh), left_motor_(left_motor_private_nh, boost::bind(&VescDifferntialDrive::leftMotorSpeed, this, _1, _2),
-                       boost::bind(&VescDifferntialDrive::batteryVoltage, this, _1)),
+: initialized_(false), nh_(nh),
+  left_motor_(left_motor_private_nh, boost::bind(&VescDifferntialDrive::leftMotorSpeed, this, _1, _2),
+              boost::bind(&VescDifferntialDrive::batteryVoltage, this, _1)),
   has_left_motor_speed_(false),
   right_motor_(right_motor_private_nh, boost::bind(&VescDifferntialDrive::rightMotorSpeed, this, _1, _2)),
   has_right_motor_speed_(false), linear_velocity_odom_(0.), angular_velocity_odom_(0.), x_odom_(0.), y_odom_(0.),
@@ -130,10 +131,15 @@ VescDifferntialDrive::VescDifferntialDrive(ros::NodeHandle nh, ros::NodeHandle p
     left_velocity_send_pub_ = nh_.advertise<std_msgs::Float32>("/left_velocity_send", 1);
     right_velocity_send_pub_ = nh_.advertise<std_msgs::Float32>("/right_velocity_send", 1);
   }
+
+  initialized_ = true;
 }
 
 void VescDifferntialDrive::timerCB(const ros::TimerEvent& /*event*/)
 {
+  if (!initialized_)
+    return;
+
   if(!left_motor_.executionCycle() || !right_motor_.executionCycle())
   {
     ROS_FATAL("driver encoutered fault in execution cycle");
@@ -144,6 +150,9 @@ void VescDifferntialDrive::timerCB(const ros::TimerEvent& /*event*/)
 
 void VescDifferntialDrive::leftMotorSpeed(const double& speed, const ros::Time &time)
 {
+  if (!initialized_)
+    return;
+
   has_left_motor_speed_ = true;
   left_motor_speed_ = speed;
   updateOdometry(time);
@@ -151,6 +160,9 @@ void VescDifferntialDrive::leftMotorSpeed(const double& speed, const ros::Time &
 
 void VescDifferntialDrive::rightMotorSpeed(const double& speed, const ros::Time &time)
 {
+  if (!initialized_)
+    return;
+
   has_right_motor_speed_ = true;
   right_motor_speed_ = speed;
   updateOdometry(time);
@@ -158,6 +170,9 @@ void VescDifferntialDrive::rightMotorSpeed(const double& speed, const ros::Time 
 
 void VescDifferntialDrive::batteryVoltage(const double& voltage)
 {
+  if (!initialized_)
+    return;
+
   std_msgs::Float32 battery_voltage_msg;
   battery_voltage_msg.data = voltage;
 
