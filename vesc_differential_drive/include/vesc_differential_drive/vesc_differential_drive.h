@@ -7,56 +7,46 @@ All rights reserved.
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef VESC_DIFFERENTIAL_DRIVE_VESCDIFFERNTIALDRIVE_H
-#define VESC_DIFFERENTIAL_DRIVE_VESCDIFFERNTIALDRIVE_H
+#ifndef VESC_DIFFERENTIAL_DRIVE_VESC_DIFFERENTIAL_DRIVE_H
+#define VESC_DIFFERENTIAL_DRIVE_VESC_DIFFERENTIAL_DRIVE_H
 
-#include <vesc_differential_drive/vesc_motor.h>
+#include <dynamic_reconfigure/server.h>
 #include <geometry_msgs/Twist.h>
 #include <tf/transform_broadcaster.h>
+#include <vesc_differential_drive/DifferentialDriveConfig.h>
+#include <vesc_differential_drive/vesc_motor.h>
 
-namespace vesc_differntial_drive
+namespace vesc_differential_drive
 {
-class VescDifferntialDrive
+class VescDifferentialDrive
 {
 public:
-  VescDifferntialDrive(ros::NodeHandle nh, ros::NodeHandle private_nh,
-                       const ros::NodeHandle &left_motor_private_nh, const ros::NodeHandle &right_motor_private_nh);
-
-  void commandVelocityCB(const geometry_msgs::Twist &cmd_vel);
+  VescDifferentialDrive(ros::NodeHandle private_nh,
+                        const ros::NodeHandle &left_motor_private_nh, const ros::NodeHandle &right_motor_private_nh);
 
 private:
-  void publishLeftMotorSpeed();
-  void publishRightMotorSpeed();
-  void publishLeftVelocity(const double &speed);
-  void publishRightVelocity(const double &speed);
-
-  void publishLeftMotorSpeedSend(const double &speed);
-  void publishRightMotorSpeedSend(const double &speed);
-  void publishLeftVelocitySend(const double &speed);
-  void publishRightVelocitySend(const double &speed);
-
-  void publishDoubleValue(const double &speed, ros::Publisher &motor_speed_pub);
+  void reconfigure(DifferentialDriveConfig& config, uint32_t level);
+  void commandVelocityCB(const geometry_msgs::Twist &cmd_vel);
+  void queryTimerCB(const ros::TimerEvent& event);
+  void odomTimerCB(const ros::TimerEvent& event);
+  void voltageTimerCB(const ros::TimerEvent& event);
+  void updateOdometry(const ros::Time &time);
+  void publishOdom();
+  double ensureBounds(double value, double max);
+  double ensureBounds(double value, double min, double max);
+  void publishDoubleValue(const double &value, ros::Publisher &publisher);
 
   bool initialized_;
 
-  ros::NodeHandle nh_;
+  ros::NodeHandle private_nh_;
+  dynamic_reconfigure::Server<DifferentialDriveConfig> reconfigure_server_;
+  DifferentialDriveConfig config_;
 
   VescMotor left_motor_;
   double left_motor_speed_;
 
   VescMotor right_motor_;
   double right_motor_speed_;
-
-  double max_velocity_linear_;
-  double max_velocity_angular_;
-  double track_width_;
-  double velocity_correction_left_;
-  double velocity_correction_right_;
-  double wheel_diameter_;
-
-  double allowed_brake_rpms_;
-  double brake_rpms_;
-  double brake_current_;
 
   ros::Time odom_update_time_;
 
@@ -67,18 +57,10 @@ private:
   double y_odom_;
   double yaw_odom_;
 
-  std::string odom_frame_;
-  std::string base_frame_;
-
-  bool publish_odom_;
   ros::Publisher odom_pub_;
-
-  bool publish_tf_;
   tf::TransformBroadcaster tf_broadcaster_;
-
   ros::Publisher battery_voltage_pub_;
 
-  bool publish_motor_speed_;
   ros::Publisher left_motor_speed_pub_;
   ros::Publisher right_motor_speed_pub_;
   ros::Publisher left_velocity_pub_;
@@ -96,21 +78,7 @@ private:
   ros::Timer odom_timer_;
 
   ros::Timer voltage_timer_;
-
-
-  void queryTimerCB(const ros::TimerEvent& event);
-
-  void odomTimerCB(const ros::TimerEvent& event);
-
-  void voltageTimerCB(const ros::TimerEvent& event);
-
-  void updateOdometry(const ros::Time &time);
-
-  void publishOdom();
-
-  double ensurBounds(double value, double max);
-  double ensurBounds(double value, double min, double max);
 };
 }
 
-#endif //VESC_DIFFERENTIAL_DRIVE_VESCDIFFERNTIALDRIVE_H
+#endif // VESC_DIFFERENTIAL_DRIVE_VESC_DIFFERENTIAL_DRIVE_H

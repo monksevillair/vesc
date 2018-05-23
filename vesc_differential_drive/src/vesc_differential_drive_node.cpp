@@ -8,18 +8,16 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
  */
 
 #include <ros/ros.h>
-#include <vesc_differential_drive/vesc_differntial_drive.h>
+#include <vesc_differential_drive/vesc_differential_drive.h>
 
 int main(int argc, char** argv)
 {
   ros::init(argc, argv, "vesc_differential_drive");
-  ros::NodeHandle nh;
-  ros::NodeHandle private_nh("~");
-  ros::NodeHandle left_motor_private_nh("~/left_motor");
-  ros::NodeHandle right_motor_private_nh("~/right_motor");
 
-  vesc_differntial_drive::VescDifferntialDrive vesc_driver(nh, private_nh, left_motor_private_nh,
-                                                           right_motor_private_nh);
+  const ros::NodeHandle private_nh("~");
+  const ros::NodeHandle left_motor_private_nh(private_nh, "left_motor");
+  const ros::NodeHandle right_motor_private_nh(private_nh, "right_motor");
+  vesc_differential_drive::VescDifferentialDrive vdd(private_nh, left_motor_private_nh, right_motor_private_nh);
 
   ros::spin();
 
