@@ -8,6 +8,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
  */
 
 #include <vesc_driver/vesc_driver_mockup.h>
+#include <ros/init.h>  // ros::ok()
 
 namespace vesc_driver
 {

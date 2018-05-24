@@ -29,7 +29,6 @@ private:
   void commandVelocityCB(const geometry_msgs::Twist &cmd_vel);
   void queryTimerCB(const ros::TimerEvent& event);
   void odomTimerCB(const ros::TimerEvent& event);
-  void voltageTimerCB(const ros::TimerEvent& event);
   void updateOdometry(const ros::Time &time);
   void publishOdom();
   double ensureBounds(double value, double max);
@@ -43,10 +42,10 @@ private:
   DifferentialDriveConfig config_;
 
   VescMotor left_motor_;
-  double left_motor_speed_;
+  double left_motor_velocity_;
 
   VescMotor right_motor_;
-  double right_motor_speed_;
+  double right_motor_velocity_;
 
   ros::Time odom_update_time_;
 

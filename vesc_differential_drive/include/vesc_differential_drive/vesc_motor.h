@@ -25,22 +25,45 @@ namespace vesc_differential_drive
 class VescMotor
 {
 public:
-  explicit VescMotor(ros::NodeHandle private_nh);
+  explicit VescMotor(const ros::NodeHandle& private_nh);
 
-  void setVelocity(double rpm);
+  /**
+   * Gets the current motor velocity in rad/s, estimated at the given time.
+   * @param time time at which velocity is estimated.
+   * @return the estimated current velocity in rad/s.
+   */
+  double getVelocity(const ros::Time& time);
 
+  /**
+   * Commands the motor to revolute with the given velocity in rad/s.
+   * @param velocity the velocity command in rad/s.
+   */
+  void setVelocity(double velocity);
+
+  /**
+   * Commands the motor to brake until it has stopped moving.
+   * @param current the current (in A) to apply to the motor.
+   */
   void brake(double current);
 
+  /**
+   * Gets the motor controller's supply voltage in V.
+   * @return the supply voltage in V.
+   */
+  double getSupplyVoltage();
+
+  /**
+   * Requests an information update from the motor controller. Initializes the motor controller if it is not already
+   * initialized.
+   * @return true on success, false on error (e.g., if the motor controller has been disconnected).
+   */
   bool executionCycle();
-
-  double getVoltage();
-
-  double getVelocity(const ros::Time& time);
 
 private:
   void reconfigure(MotorConfig& config, uint32_t level);
   void servoSensorCB(const boost::shared_ptr<std_msgs::Float64>& servo_sensor_value);
   void stateCB(const boost::shared_ptr<vesc_msgs::VescStateStamped>& state);
+  double getVelocityConversionFactor() const;
 
   bool predict(const ros::Time &time);
   void correct(double velocity);
@@ -53,11 +76,9 @@ private:
   boost::shared_ptr<vesc_driver::VescDriverInterface> driver_;
 
   boost::mutex state_mutex_;
-
   cv::KalmanFilter speed_kf_;
   ros::Time last_prediction_time_;
-
-  double current_voltage_;
+  double supply_voltage_;
 };
 }
 

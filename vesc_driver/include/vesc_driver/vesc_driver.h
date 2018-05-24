@@ -3,17 +3,15 @@
 #ifndef VESC_DRIVER_VESC_DRIVER_H_
 #define VESC_DRIVER_VESC_DRIVER_H_
 
-#include <string>
-
-#include <ros/ros.h>
-#include <std_msgs/Float64.h>
 #include <boost/optional.hpp>
-
-#include "vesc_driver/vesc_interface.h"
-#include "vesc_driver/vesc_packet.h"
 #include <boost/thread/mutex.hpp>
-#include <vesc_msgs/VescStateStamped.h>
+#include <ros/node_handle.h>
+#include <std_msgs/Float64.h>
+#include <string>
 #include <vesc_driver/vesc_driver_interface.h>
+#include <vesc_driver/vesc_interface.h>
+#include <vesc_driver/vesc_packet.h>
+#include <vesc_msgs/VescStateStamped.h>
 
 namespace vesc_driver
 {
@@ -22,9 +20,9 @@ class VescDriver : public VescDriverInterface
 {
 public:
 
-  VescDriver(ros::NodeHandle private_nh,
-             const ServoSensorHandlerFunction& servo_sensor_handler = ServoSensorHandlerFunction(),
-             const StateHandlerFunction& state_handler = StateHandlerFunction());
+  explicit VescDriver(ros::NodeHandle private_nh,
+                      const ServoSensorHandlerFunction& servo_sensor_handler = ServoSensorHandlerFunction(),
+                      const StateHandlerFunction& state_handler = StateHandlerFunction());
 
   /**
    * @param duty_cycle Commanded VESC duty cycle. Valid range for this driver is -1 to +1. However,
@@ -89,7 +87,8 @@ private:
   CommandLimit servo_limit_;
 
   // driver modes (possible states)
-  typedef enum {
+  typedef enum
+  {
     MODE_INITIALIZING,
     MODE_OPERATING
   } driver_mode_t;

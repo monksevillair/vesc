@@ -15,8 +15,8 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_differential_drive
 {
-VescMotor::VescMotor(ros::NodeHandle private_nh)
-  : private_nh_(private_nh), reconfigure_server_(private_nh), current_voltage_(std::numeric_limits<double>::quiet_NaN())
+VescMotor::VescMotor(const ros::NodeHandle& private_nh)
+  : private_nh_(private_nh), reconfigure_server_(private_nh), supply_voltage_(std::numeric_limits<double>::quiet_NaN())
 {
   reconfigure_server_.setCallback(boost::bind(&VescMotor::reconfigure, this, _1, _2));
 
@@ -56,11 +56,18 @@ VescMotor::VescMotor(ros::NodeHandle private_nh)
   cv::setIdentity(speed_kf_.errorCovPre);
 }
 
-void VescMotor::setVelocity(double rpm)
+double VescMotor::getVelocity(const ros::Time& time)
+{
+  boost::mutex::scoped_lock state_lock(state_mutex_);
+  predict(time);
+  return speed_kf_.statePre.at<float>(0);
+}
+
+void VescMotor::setVelocity(double velocity)
 {
   boost::mutex::scoped_lock driver_lock(driver_mutex_);
   std_msgs::Float64::Ptr motor_speed(new std_msgs::Float64());
-  motor_speed->data = rpm * (config_.invert_direction ? -1. : 1.) * config_.motor_poles * config_.velocity_correction;
+  motor_speed->data = velocity * getVelocityConversionFactor();
   driver_->setSpeed(motor_speed);
 }
 
@@ -72,26 +79,10 @@ void VescMotor::brake(double current)
   driver_->setBrake(brake_current);
 }
 
-void VescMotor::servoSensorCB(const boost::shared_ptr<std_msgs::Float64>& /*servo_sensor_value*/)
-{
-}
-
-void VescMotor::stateCB(const boost::shared_ptr<vesc_msgs::VescStateStamped>& state)
+double VescMotor::getSupplyVoltage()
 {
   boost::mutex::scoped_lock state_lock(state_mutex_);
-
-  if (predict(state->header.stamp)) // only correct if prediction can be performed
-  {
-    const double v = state->state.speed
-      / ((config_.invert_direction ? -1. : 1.) * config_.motor_poles * config_.velocity_correction);
-    correct(v);
-  }
-  else
-  {
-    ROS_WARN("Skipping state correction due to failed prediction");
-  }
-
-  current_voltage_ = state->state.voltage_input;
+  return supply_voltage_;
 }
 
 bool VescMotor::executionCycle()
@@ -100,21 +91,11 @@ bool VescMotor::executionCycle()
   return driver_->executionCycle();
 }
 
-double VescMotor::getVoltage()
-{
-  boost::mutex::scoped_lock state_lock(state_mutex_);
-  return current_voltage_;
-}
-
-double VescMotor::getVelocity(const ros::Time& time)
-{
-  boost::mutex::scoped_lock state_lock(state_mutex_);
-  predict(time);
-  return speed_kf_.statePre.at<float>(0);
-}
-
 void VescMotor::reconfigure(MotorConfig& config, uint32_t /*level*/)
 {
+  boost::mutex::scoped_lock driver_lock(driver_mutex_);
+  boost::mutex::scoped_lock state_lock(state_mutex_);
+
   config_ = config;
 
   if (config_.motor_poles == 0.0)
@@ -139,25 +120,47 @@ void VescMotor::reconfigure(MotorConfig& config, uint32_t /*level*/)
   }
 }
 
+void VescMotor::servoSensorCB(const boost::shared_ptr<std_msgs::Float64>& /*servo_sensor_value*/)
+{
+}
+
+void VescMotor::stateCB(const boost::shared_ptr<vesc_msgs::VescStateStamped>& state)
+{
+  boost::mutex::scoped_lock state_lock(state_mutex_);
+
+  if (predict(state->header.stamp)) // only correct if prediction can be performed
+  {
+    correct(state->state.speed / getVelocityConversionFactor());
+  }
+  else
+  {
+    ROS_WARN("Skipping state correction due to failed prediction");
+  }
+
+  supply_voltage_ = state->state.voltage_input;
+}
+
+double VescMotor::getVelocityConversionFactor() const
+{
+  // The Vesc controller expects and reports velocities in electrical RPM:
+  return (config_.invert_direction ? -1.0 : 1.0) * config_.motor_poles * config_.velocity_correction * 30.0 * M_1_PI;
+}
+
 bool VescMotor::predict(const ros::Time& time)
 {
-  bool predicted = false;
-  if (last_prediction_time_.isZero())
+  if (time > last_prediction_time_)
   {
-    last_prediction_time_ = time;
-  }
-  else if (time > last_prediction_time_)
-  {
-    const double dt = (time - last_prediction_time_).toSec();
-    speed_kf_.transitionMatrix.at<float>(0, 1) = static_cast<float>(dt);
-
-    // let the kalman magic happen :P
-    speed_kf_.predict();
+    if (!last_prediction_time_.isZero())
+    {
+      const double dt = (time - last_prediction_time_).toSec();
+      speed_kf_.transitionMatrix.at<float>(0, 1) = static_cast<float>(dt);
+      speed_kf_.predict();
+    }
 
     last_prediction_time_ = time;
-    predicted = true;
+    return true;
   }
-  return predicted;
+  return false;
 }
 
 void VescMotor::correct(double velocity)

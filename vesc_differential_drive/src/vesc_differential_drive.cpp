@@ -18,7 +18,8 @@ namespace vesc_differential_drive
 VescDifferentialDrive::VescDifferentialDrive(ros::NodeHandle private_nh, const ros::NodeHandle& left_motor_private_nh,
                                              const ros::NodeHandle& right_motor_private_nh)
   : initialized_(false), private_nh_(private_nh), reconfigure_server_(private_nh_), left_motor_(left_motor_private_nh),
-    left_motor_speed_(0.), right_motor_(right_motor_private_nh), right_motor_speed_(0.), linear_velocity_odom_(0.),
+    left_motor_velocity_(0.), right_motor_(right_motor_private_nh), right_motor_velocity_(0.),
+    linear_velocity_odom_(0.),
     angular_velocity_odom_(0.), x_odom_(0.), y_odom_(0.), yaw_odom_(0.)
 {
   reconfigure_server_.setCallback(boost::bind(&VescDifferentialDrive::reconfigure, this, _1, _2));
@@ -30,9 +31,9 @@ VescDifferentialDrive::VescDifferentialDrive(ros::NodeHandle private_nh, const r
 
   cmd_vel_sub_ = private_nh_.subscribe("/cmd_vel", 1, &VescDifferentialDrive::commandVelocityCB, this);
 
-  odom_timer_ = private_nh_.createTimer(ros::Duration(1.0 / config_.odometry_time_frequency),
+  odom_timer_ = private_nh_.createTimer(ros::Duration(1.0 / config_.odometry_rate),
                                         &VescDifferentialDrive::odomTimerCB, this);
-  query_timer_ = private_nh_.createTimer(ros::Duration(1.0 / (config_.odometry_time_frequency * 2.1)),
+  query_timer_ = private_nh_.createTimer(ros::Duration(1.0 / (config_.odometry_rate * 2.1)),
                                          &VescDifferentialDrive::queryTimerCB, this);
 
   battery_voltage_pub_ = private_nh_.advertise<std_msgs::Float32>("/battery_voltage", 1);
@@ -77,14 +78,14 @@ void VescDifferentialDrive::reconfigure(DifferentialDriveConfig& config, uint32_
     ROS_ERROR("Parameter wheel_diameter is not set");
   }
 
-  if (config.allowed_brake_rpms == 0.0)
+  if (config.allowed_brake_velocity == 0.0)
   {
-    ROS_ERROR("Parameter allowed_brake_rpms is not set");
+    ROS_ERROR("Parameter allowed_brake_velocity is not set");
   }
 
-  if (config.brake_rpms == 0.0)
+  if (config.brake_velocity == 0.0)
   {
-    ROS_ERROR("Parameter brake_rpms is not set");
+    ROS_ERROR("Parameter brake_velocity is not set");
   }
 
   if (config.brake_current == 0.0)
@@ -113,17 +114,10 @@ void VescDifferentialDrive::odomTimerCB(const ros::TimerEvent& event)
 {
   if (initialized_)
   {
-    left_motor_speed_ = left_motor_.getVelocity(event.current_real);
-    right_motor_speed_ = right_motor_.getVelocity(event.current_real);
+    left_motor_velocity_ = left_motor_.getVelocity(event.current_real);
+    right_motor_velocity_ = right_motor_.getVelocity(event.current_real);
     updateOdometry(event.current_real);
-  }
-}
-
-void VescDifferentialDrive::voltageTimerCB(const ros::TimerEvent& /*event*/)
-{
-  if (initialized_)
-  {
-    publishDoubleValue(left_motor_.getVoltage(), battery_voltage_pub_);
+    publishDoubleValue(left_motor_.getSupplyVoltage(), battery_voltage_pub_);
   }
 }
 
@@ -132,67 +126,73 @@ void VescDifferentialDrive::commandVelocityCB(const geometry_msgs::Twist& cmd_ve
   const double linear_velocity = ensureBounds(cmd_vel.linear.x, config_.max_velocity_linear);
   const double angular_velocity = ensureBounds(cmd_vel.angular.z, config_.max_velocity_angular);
 
-  const double left_velocity = (linear_velocity - angular_velocity * config_.track_width / 2.0);
-  const double right_velocity = (linear_velocity + angular_velocity * config_.track_width / 2.0);
-
-  const double left_rpm = left_velocity / (M_PI * config_.wheel_diameter) * 60.;
-  const double right_rpm = right_velocity / (M_PI * config_.wheel_diameter) * 60.;
+  const double left_tangential_velocity = (linear_velocity - angular_velocity * 0.5 * config_.track_width);
+  const double right_tangential_velocity = (linear_velocity + angular_velocity * 0.5 * config_.track_width);
 
   if (config_.publish_motor_speed)
   {
-    publishDoubleValue(left_velocity, left_velocity_send_pub_);
-    publishDoubleValue(right_velocity, right_velocity_send_pub_);
+    publishDoubleValue(left_tangential_velocity, left_velocity_send_pub_);
+    publishDoubleValue(right_tangential_velocity, right_velocity_send_pub_);
   }
 
-  if ((std::fabs(left_rpm) <= config_.brake_rpms) && (std::fabs(right_rpm) <= config_.brake_rpms)
-    && (std::fabs(left_motor_speed_) <= config_.allowed_brake_rpms)
-    && (std::fabs(right_motor_speed_) <= config_.allowed_brake_rpms))
+  const double left_rotational_velocity = left_tangential_velocity / (0.5 * config_.wheel_diameter);
+  const double right_rotational_velocity = right_tangential_velocity / (0.5 * config_.wheel_diameter);
+
+  if ((std::fabs(left_rotational_velocity) <= config_.brake_velocity)
+    && (std::fabs(right_rotational_velocity) <= config_.brake_velocity)
+    && (std::fabs(left_motor_velocity_) <= config_.allowed_brake_velocity)
+    && (std::fabs(right_motor_velocity_) <= config_.allowed_brake_velocity))
   {
-    ROS_DEBUG_STREAM("brake due to left_rpm: " << left_rpm << " right_rpm: " << right_rpm
-                                               << " left_motor_speed: " << left_motor_speed_ << " right_motor_speed: "
-                                               << right_motor_speed_);
+    ROS_DEBUG_STREAM("brake due to"
+                       << " left_rotational_velocity: " << left_rotational_velocity
+                       << " right_rotational_velocity: " << right_rotational_velocity
+                       << " left_motor_velocity: " << left_motor_velocity_
+                       << " right_motor_velocity: " << right_motor_velocity_);
     left_motor_.brake(config_.brake_current);
     right_motor_.brake(config_.brake_current);
   }
   else
   {
-    left_motor_.setVelocity(left_rpm);
-    right_motor_.setVelocity(right_rpm);
+    left_motor_.setVelocity(left_rotational_velocity);
+    right_motor_.setVelocity(right_rotational_velocity);
 
     if (config_.publish_motor_speed)
     {
-      publishDoubleValue(left_rpm, left_motor_speed_send_pub_);
-      publishDoubleValue(right_rpm, right_motor_speed_send_pub_);
+      publishDoubleValue(left_rotational_velocity, left_motor_speed_send_pub_);
+      publishDoubleValue(right_rotational_velocity, right_motor_speed_send_pub_);
     }
   }
 }
 
 void VescDifferentialDrive::updateOdometry(const ros::Time& time)
 {
-  ROS_DEBUG_STREAM("left_motor_speed: " << left_motor_speed_ << " right_motor_speed: " << right_motor_speed_);
+  ROS_DEBUG_STREAM(
+    "left_motor_velocity: " << left_motor_velocity_ << " right_motor_velocity: " << right_motor_velocity_);
 
-  const double left_velocity = left_motor_speed_ * M_PI * config_.wheel_diameter / 60.0;
-  const double right_velocity = right_motor_speed_ * M_PI * config_.wheel_diameter / 60.0;
+  const double left_tangential_velocity = left_motor_velocity_ * 0.5 * config_.wheel_diameter;
+  const double right_tangential_velocity = right_motor_velocity_ * 0.5 * config_.wheel_diameter;
 
   if (config_.publish_motor_speed)
   {
-    publishDoubleValue(left_motor_speed_, left_motor_speed_pub_);
-    publishDoubleValue(right_motor_speed_, right_motor_speed_pub_);
-    publishDoubleValue(left_velocity, left_velocity_pub_);
-    publishDoubleValue(right_velocity, right_velocity_pub_);
+    publishDoubleValue(left_motor_velocity_, left_motor_speed_pub_);
+    publishDoubleValue(right_motor_velocity_, right_motor_speed_pub_);
+    publishDoubleValue(left_tangential_velocity, left_velocity_pub_);
+    publishDoubleValue(right_tangential_velocity, right_velocity_pub_);
   }
 
-  ROS_DEBUG_STREAM("left_velocity: " << left_velocity << " right_velocity: " << right_velocity);
+  ROS_DEBUG_STREAM("left_tangential_velocity: " << left_tangential_velocity << " right_tangential_velocity: "
+                                                << right_tangential_velocity);
 
-  if (!std::isfinite(left_velocity) || !std::isfinite(right_velocity))
+  if (!std::isfinite(left_tangential_velocity) || !std::isfinite(right_tangential_velocity))
   {
-    ROS_ERROR_STREAM("velocity of motors is not valid (NAN or INF): " << " left_velocity: " << left_velocity
-                                                                      << " right_velocity: " << right_velocity);
+    ROS_ERROR_STREAM("velocity of motors is not valid (NAN or INF): "
+                       << " left_tangential_velocity: " << left_tangential_velocity
+                       << " right_tangential_velocity: " << right_tangential_velocity);
     return;
   }
 
-  linear_velocity_odom_ = (left_velocity + right_velocity) / 2.;
-  angular_velocity_odom_ = (right_velocity - left_velocity) / config_.track_width;
+  linear_velocity_odom_ = (left_tangential_velocity + right_tangential_velocity) / 2.;
+  angular_velocity_odom_ = (right_tangential_velocity - left_tangential_velocity) / config_.track_width;
 
   if (!odom_update_time_.isZero())
   {
