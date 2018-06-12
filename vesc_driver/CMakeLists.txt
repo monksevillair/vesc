@@ -11,12 +11,13 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
   INCLUDE_DIRS include
   CATKIN_DEPENDS pluginlib roscpp serial std_msgs
-  LIBRARIES ${PROJECT_NAME} ${PROJECT_NAME}_ros
+  LIBRARIES ${PROJECT_NAME}
 )
 
 ###########
 ## Build ##
 ###########
+add_compile_options(-std=c++11)
 
 include_directories(
   include
@@ -25,7 +26,9 @@ include_directories(
 )
 
 add_library(${PROJECT_NAME}
-)
+        include/vesc_driver/motor_controller_state.h
+        include/vesc_driver/vesc_driver_interface.h
+        src/vesc_driver_mockup.cpp include/vesc_driver/vesc_driver_mockup.h src/periodic_execution.cpp include/vesc_driver/periodic_execution.h)
 
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
