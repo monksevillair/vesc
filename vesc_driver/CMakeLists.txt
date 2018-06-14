@@ -28,7 +28,7 @@ include_directories(
 add_library(${PROJECT_NAME}
         include/vesc_driver/motor_controller_state.h
         include/vesc_driver/vesc_driver_interface.h
-        src/vesc_driver_mockup.cpp include/vesc_driver/vesc_driver_mockup.h src/periodic_execution.cpp include/vesc_driver/periodic_execution.h)
+        src/vesc_driver_mockup.cpp include/vesc_driver/vesc_driver_mockup.h src/periodic_execution.cpp include/vesc_driver/periodic_execution.h include/vesc_driver/packet.h src/transport_request.cpp include/vesc_driver/transport_request.h include/vesc_driver/transport.h src/serial_transport.cpp include/vesc_driver/serial_transport.h src/serial_packet_codec.cpp include/vesc_driver/serial_packet_codec.h src/byte_buffer.cpp include/vesc_driver/byte_buffer.h include/vesc_driver/blocking_queue.h src/vesc_driver_serial.cpp include/vesc_driver/vesc_driver_serial.h)
 
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}

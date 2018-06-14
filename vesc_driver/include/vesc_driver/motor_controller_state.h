@@ -20,7 +20,7 @@ namespace vesc_driver
         fault_code(FAULT_CODE::NO_FAULT), voltage_input(0.), current_motor(0.), current_input(0.), speed(0.),
         position(0.), duty_cycle(0.), charge_drawn(0.), displacement(0), distance_traveled(0), charge_regen(0.)
     { }
-    enum class FAULT_CODE{NO_FAULT, OVER_VOLTAGE, UNDER_VOLTAGE, DRV8302, ABS_OVER_CURRENT, OVER_TEMP_FET, OVER_TEMP_MOTOR};
+    enum FAULT_CODE {NO_FAULT = 0, OVER_VOLTAGE, UNDER_VOLTAGE, DRV8302, ABS_OVER_CURRENT, OVER_TEMP_FET, OVER_TEMP_MOTOR};
 
     FAULT_CODE fault_code;
     double voltage_input;        // input voltage in (V)

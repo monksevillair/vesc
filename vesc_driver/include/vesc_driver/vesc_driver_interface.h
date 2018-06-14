@@ -40,7 +40,7 @@ namespace vesc_driver
      *              However, note that the VESC may impose a more restrictive bounds on the range
      *              depending on its configuration.
      */
-    virtual void setBrake(double brake) = 0;
+    virtual void setBrake(double brake_current) = 0;
 
     /**
      * @param speed Commanded VESC speed in electrical RPM. Electrical RPM is the mechanical RPM
