@@ -18,6 +18,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <mutex>
 #include <atomic>
 #include <vesc_driver/blocking_queue.h>
+#include <map>
 
 namespace vesc_driver
 {
@@ -47,6 +48,11 @@ namespace vesc_driver
 
     uint8_t controller_id_;
 
+    std::mutex should_respond_mutex_;
+    bool should_respond_;
+    uint8_t respond_id_;
+    std::condition_variable should_respond_condition_;
+
     serial::Serial serial_port_;
 
     std::atomic<bool> should_write_;
@@ -56,7 +62,7 @@ namespace vesc_driver
     std::atomic<bool> should_read_;
     std::thread read_thread_;
     std::mutex pacekt_handler_mutex_;
-    Transport::PacketHandler pacekt_handler_;
+    std::map<uint8_t, Transport::PacketHandler> packet_handlers_;
 
     SerialPacketCodec packet_codec_;
 

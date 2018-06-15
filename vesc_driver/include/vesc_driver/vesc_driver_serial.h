@@ -22,6 +22,10 @@ namespace vesc_driver
     VescDriverSerial(const std::chrono::duration<double> &sleep_duration,
                      const StateHandlerFunction &state_handler_function, uint8_t controller_id, const std::string &port);
 
+    VescDriverSerial(const std::chrono::duration<double> &sleep_duration,
+                     const StateHandlerFunction &state_handler_function, uint8_t controller_id,
+                     std::shared_ptr<SerialTransport> serial_transport);
+
     void setDutyCycle(double duty_cycle) override;
 
     void setCurrent(double current) override;
@@ -67,7 +71,7 @@ namespace vesc_driver
     void receiveFirmwareVersion(const FirmwareVersion& fw_version);
     void receiveMotorControllerStateCB(const MotorControllerState& state);
 
-    SerialTransport serial_transport_;
+    std::shared_ptr<SerialTransport> serial_transport_;
 
     PacketVariantVisitor packet_visitor_;
 

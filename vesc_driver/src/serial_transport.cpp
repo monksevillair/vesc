@@ -13,7 +13,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 namespace vesc_driver
 {
 
-  SerialTransport::SerialTransport(uint8_t controller_id) : controller_id_(controller_id),
+  SerialTransport::SerialTransport(uint8_t controller_id) : controller_id_(controller_id), should_respond_(false),
                                                             serial_port_(std::string(), 115200,
                                                                          serial::Timeout::simpleTimeout(100),
                                                                          serial::eightbits, serial::parity_none,
@@ -23,14 +23,7 @@ namespace vesc_driver
 
   void SerialTransport::submit(TransportRequest &&r)
   {
-    if (r.getControllerId() == controller_id_)
-    {
-      write_queue_.push(std::forward<TransportRequest>(r));
-    }
-    else
-    {
-      throw std::runtime_error("send transport request for wrong id");
-    }
+    write_queue_.push(std::forward<TransportRequest>(r));
   }
 
   void SerialTransport::connect(const std::string &port)
@@ -147,22 +140,29 @@ namespace vesc_driver
         continue;
       }
 
-      if (pacekt_handler_)
-        pacekt_handler_(paket.get());
+      {
+        std::unique_lock<std::mutex> should_respond_lock(should_respond_mutex_);
+        if (should_respond_)
+        {
+          should_respond_ = false;
+
+          std::lock_guard<std::mutex> pacekt_handler_lock(pacekt_handler_mutex_);
+          if (packet_handlers_.find(respond_id_) == packet_handlers_.end())
+          {
+            // no packet handler registered
+            continue;
+          }
+          else
+            packet_handlers_[respond_id_](paket.get());
+        }
+      }
     }
   }
 
   void SerialTransport::registerPacketHandler(uint8_t controller_id, Transport::PacketHandler &&pacekt_handler)
   {
-    if (controller_id == controller_id_)
-    {
-      std::lock_guard<std::mutex> pacekt_handler_lock(pacekt_handler_mutex_);
-      pacekt_handler_ = pacekt_handler;
-    }
-    else
-    {
-      throw std::runtime_error("register packet handler for wrong id");
-    }
+    std::lock_guard<std::mutex> pacekt_handler_lock(pacekt_handler_mutex_);
+    packet_handlers_[controller_id] = pacekt_handler;
   }
 
   void SerialTransport::writeLoop()
@@ -173,10 +173,30 @@ namespace vesc_driver
       {
         TransportRequest request = write_queue_.pop();
 
-        ByteBuffer write_buffer;
-        packet_codec_.encode(request.getPacket(), write_buffer);
+        {
+          std::unique_lock<std::mutex> should_respond_lock(should_respond_mutex_);
+          while (should_respond_)
+            should_respond_condition_.wait(should_respond_lock);
+        }
 
-        write(write_buffer);
+        ByteBuffer write_buffer;
+
+        if (request.getControllerId() == controller_id_)
+          packet_codec_.encode(request.getPacket(), write_buffer);
+        else
+          packet_codec_.fowardCan(request.getPacket(), write_buffer, request.getControllerId());
+
+        {
+          std::unique_lock<std::mutex> should_respond_lock(should_respond_mutex_);
+
+          write(write_buffer);
+
+          if (request.expectResponse())
+          {
+            should_respond_ = true;
+            respond_id_ = request.getControllerId();
+          }
+        }
       }
       catch (const InterruptException& exception)
       {

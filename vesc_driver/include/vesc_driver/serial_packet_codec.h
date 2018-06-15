@@ -29,6 +29,14 @@ namespace vesc_driver
 
     virtual boost::optional<PacketVariant> decode(const ByteBuffer& buffer);
 
+    virtual void fowardCan(const PacketVariant& packet, ByteBuffer& buffer, uint8_t can_id)
+    {
+      Encoder encoder(buffer);
+      boost::apply_visitor(encoder, packet);
+
+      encoder.fowardCan(can_id);
+    }
+
     constexpr static size_t VESC_MIN_FRAME_SIZE=5;
     constexpr static size_t VESC_SMALL_FRAME=2;
     constexpr static size_t VESC_LARGE_FRAME=3;
@@ -52,6 +60,8 @@ namespace vesc_driver
       void operator()(const GetFirmwareVersion& packet);
       void operator()(const FirmwareVersion& packet);
 
+      void fowardCan(uint8_t can_id);
+
       constexpr static uint8_t VESC_SET_DUTY_CYCLE_PACKET_PAYLOAD_SIZE=5;
       constexpr static uint8_t VESC_SET_DUTY_CYCLE_PACKET=5;
 
@@ -71,7 +81,10 @@ namespace vesc_driver
       constexpr static uint8_t VESC_GET_VALUES_POSITION_PACKET=4;
 
       constexpr static uint8_t VESC_GET_FW_VERSION_PACKET_PAYLOAD_SIZE=1;
-      constexpr static uint8_t VESC_GET_FW_VERSION_POSITION_PACKET=0;
+      constexpr static uint8_t VESC_GET_FW_VERSION_PACKET=0;
+
+      constexpr static uint8_t VESC_FOWARD_CAN_PAYLOAD_SIZE=2;
+      constexpr static uint8_t VESC_FOWARD_CAN=27;
     protected:
       ByteBuffer& buffer_;
       uint16_t payload_size_;

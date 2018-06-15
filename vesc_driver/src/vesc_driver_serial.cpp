@@ -14,15 +14,29 @@ namespace vesc_driver
   VescDriverSerial::VescDriverSerial(const std::chrono::duration<double> &sleep_duration,
                                      const vesc_driver::VescDriverInterface::StateHandlerFunction &state_handler_function,
                                      uint8_t controller_id, const std::string &port) :
-      VescDriverInterface(state_handler_function), PeriodicExecution(sleep_duration), serial_transport_(controller_id),
+      VescDriverInterface(state_handler_function), PeriodicExecution(sleep_duration),
       packet_visitor_(std::bind(&VescDriverSerial::receiveFirmwareVersion, this, std::placeholders::_1),
                       std::bind(&VescDriverSerial::receiveMotorControllerStateCB, this, std::placeholders::_1)),
       initialized_(false), major_fw_version_(0), minor_fw_version_(0), controller_id_(controller_id)
   {
-    serial_transport_.registerPacketHandler(controller_id, std::bind(&VescDriverSerial::processPacketVariant, this,
+    serial_transport_ = std::make_shared<SerialTransport>(controller_id);
+    serial_transport_->registerPacketHandler(controller_id, std::bind(&VescDriverSerial::processPacketVariant, this,
                                                                      std::placeholders::_1));
 
-    serial_transport_.connect(port);
+    serial_transport_->connect(port);
+  }
+
+  VescDriverSerial::VescDriverSerial(const std::chrono::duration<double> &sleep_duration,
+                                     const StateHandlerFunction &state_handler_function, uint8_t controller_id,
+                                     std::shared_ptr<SerialTransport> serial_transport) :
+      VescDriverInterface(state_handler_function), PeriodicExecution(sleep_duration),
+      serial_transport_(serial_transport),
+      packet_visitor_(std::bind(&VescDriverSerial::receiveFirmwareVersion, this, std::placeholders::_1),
+                      std::bind(&VescDriverSerial::receiveMotorControllerStateCB, this, std::placeholders::_1)),
+      initialized_(false), major_fw_version_(0), minor_fw_version_(0), controller_id_(controller_id)
+  {
+    serial_transport_->registerPacketHandler(controller_id, std::bind(&VescDriverSerial::processPacketVariant, this,
+                                                                      std::placeholders::_1));
   }
 
   void VescDriverSerial::setDutyCycle(double duty_cycle)
@@ -32,7 +46,7 @@ namespace vesc_driver
 
     TransportRequest request(controller_id_, packet);
 
-    serial_transport_.submit(std::forward<TransportRequest>(request));
+    serial_transport_->submit(std::forward<TransportRequest>(request));
   }
 
   void VescDriverSerial::setCurrent(double current)
@@ -42,7 +56,7 @@ namespace vesc_driver
 
     TransportRequest request(controller_id_, packet);
 
-    serial_transport_.submit(std::forward<TransportRequest>(request));
+    serial_transport_->submit(std::forward<TransportRequest>(request));
   }
 
   void VescDriverSerial::setBrake(double brake)
@@ -52,7 +66,7 @@ namespace vesc_driver
 
     TransportRequest request(controller_id_, packet);
 
-    serial_transport_.submit(std::forward<TransportRequest>(request));
+    serial_transport_->submit(std::forward<TransportRequest>(request));
   }
 
   void VescDriverSerial::setSpeed(double speed)
@@ -62,7 +76,7 @@ namespace vesc_driver
 
     TransportRequest request(controller_id_, packet);
 
-    serial_transport_.submit(std::forward<TransportRequest>(request));
+    serial_transport_->submit(std::forward<TransportRequest>(request));
   }
 
   void VescDriverSerial::setPosition(double position)
@@ -72,7 +86,7 @@ namespace vesc_driver
 
     TransportRequest request(controller_id_, packet);
 
-    serial_transport_.submit(std::forward<TransportRequest>(request));
+    serial_transport_->submit(std::forward<TransportRequest>(request));
   }
 
   void VescDriverSerial::execution()
@@ -81,17 +95,17 @@ namespace vesc_driver
     {
       GetFirmwareVersion packet;
 
-      TransportRequest request(controller_id_, packet);
+      TransportRequest request(controller_id_, packet, true);
 
-      serial_transport_.submit(std::forward<TransportRequest>(request));
+      serial_transport_->submit(std::forward<TransportRequest>(request));
     }
     else
     {
       GetValuesPacket packet;
 
-      TransportRequest request(controller_id_, packet);
+      TransportRequest request(controller_id_, packet, true);
 
-      serial_transport_.submit(std::forward<TransportRequest>(request));
+      serial_transport_->submit(std::forward<TransportRequest>(request));
     }
   }
 

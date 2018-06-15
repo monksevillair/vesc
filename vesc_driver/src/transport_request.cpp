@@ -11,8 +11,9 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_driver
 {
-  TransportRequest::TransportRequest(uint8_t controller_id, vesc_driver::PacketVariant &&packet)
-      : controller_id_(controller_id), packet_(std::forward<vesc_driver::PacketVariant>(packet))
+  TransportRequest::TransportRequest(uint8_t controller_id, vesc_driver::PacketVariant &&packet, bool expect_response)
+      : controller_id_(controller_id), packet_(std::forward<vesc_driver::PacketVariant>(packet)),
+        expect_response_(expect_response)
   { }
 
   uint8_t TransportRequest::getControllerId()
@@ -23,5 +24,10 @@ namespace vesc_driver
   PacketVariant TransportRequest::getPacket()
   {
     return packet_;
+  }
+
+  bool TransportRequest::expectResponse()
+  {
+    return expect_response_;
   }
 }

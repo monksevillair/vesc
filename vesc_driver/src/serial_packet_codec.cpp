@@ -24,7 +24,7 @@ namespace vesc_driver
       case Encoder::VESC_GET_VALUES_POSITION_PACKET:
         return decodeMotorControllerState(parsing_buffer);
 
-      case Encoder::VESC_GET_FW_VERSION_POSITION_PACKET:
+      case Encoder::VESC_GET_FW_VERSION_PACKET:
         return decodeFirmwareVersion(parsing_buffer);
 
       default:
@@ -127,7 +127,7 @@ namespace vesc_driver
   void SerialPacketCodec::Encoder::operator()(const GetFirmwareVersion &packet)
   {
     createHeader(VESC_GET_FW_VERSION_PACKET_PAYLOAD_SIZE);
-    setPayloadID(VESC_GET_FW_VERSION_POSITION_PACKET);
+    setPayloadID(VESC_GET_FW_VERSION_PACKET);
     addCRC();
   }
 
@@ -174,6 +174,36 @@ namespace vesc_driver
     uint16_t checksum = static_cast<uint16_t>(crc_calculation.checksum());
     buffer_.addUnsigedInt16(checksum);
     buffer_.addUnsigedInt8(VESC_EOF_BYTE);
+  }
+
+  void SerialPacketCodec::Encoder::fowardCan(uint8_t can_id)
+  {
+    buffer_.resetParsing();
+    uint8_t start_byte = buffer_.parsUnsignedInt8();
+
+    uint16_t payload_size;
+    size_t offset = 1;
+    if (start_byte == VESC_SMALL_FRAME)
+    {
+      payload_size = buffer_.parsUnsignedInt8();
+      offset += 1;
+    }
+    else
+    {
+      payload_size = buffer_.parsUnsignedInt16();
+      offset += 2;
+    }
+
+    std::vector<uint8_t> original_bytes = buffer_;
+    original_bytes.erase(original_bytes.begin(), original_bytes.begin() + offset);
+    original_bytes.erase(original_bytes.begin() + payload_size, original_bytes.end());
+    buffer_.clear();
+
+    createHeader(payload_size + VESC_FOWARD_CAN_PAYLOAD_SIZE);
+    setPayloadID(VESC_FOWARD_CAN);
+    buffer_.addUnsigedInt8(can_id);
+    buffer_.addBytes(original_bytes);
+    addCRC();
   }
 
 }
