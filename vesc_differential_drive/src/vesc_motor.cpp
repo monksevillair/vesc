@@ -10,13 +10,14 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <boost/bind.hpp>
 #include <limits>
 #include <stdexcept>
-#include <vesc_driver/vesc_driver.h>
+#include <vesc_driver/vesc_driver_serial.h>
 #include <vesc_driver/vesc_driver_mockup.h>
 
 namespace vesc_differential_drive
 {
-VescMotor::VescMotor(const ros::NodeHandle& private_nh)
-  : private_nh_(private_nh), reconfigure_server_(private_nh), supply_voltage_(std::numeric_limits<double>::quiet_NaN())
+VescMotor::VescMotor(const ros::NodeHandle& private_nh, double execution_duration)
+  : private_nh_(private_nh), reconfigure_server_(private_nh), execution_duration_(execution_duration),
+    supply_voltage_(std::numeric_limits<double>::quiet_NaN())
 {
   reconfigure_server_.setCallback(boost::bind(&VescMotor::reconfigure, this, _1, _2));
 
@@ -66,29 +67,19 @@ double VescMotor::getVelocity(const ros::Time& time)
 void VescMotor::setVelocity(double velocity)
 {
   boost::mutex::scoped_lock driver_lock(driver_mutex_);
-  std_msgs::Float64::Ptr motor_speed(new std_msgs::Float64());
-  motor_speed->data = velocity * getVelocityConversionFactor();
-  driver_->setSpeed(motor_speed);
+  driver_->setSpeed(velocity);
 }
 
 void VescMotor::brake(double current)
 {
   boost::mutex::scoped_lock driver_lock(driver_mutex_);
-  std_msgs::Float64::Ptr brake_current(new std_msgs::Float64());
-  brake_current->data = current;
-  driver_->setBrake(brake_current);
+  driver_->setBrake(current);
 }
 
 double VescMotor::getSupplyVoltage()
 {
   boost::mutex::scoped_lock state_lock(state_mutex_);
   return supply_voltage_;
-}
-
-bool VescMotor::executionCycle()
-{
-  boost::mutex::scoped_lock driver_lock(driver_mutex_);
-  return driver_->executionCycle();
 }
 
 void VescMotor::reconfigure(MotorConfig& config, uint32_t /*level*/)
@@ -107,37 +98,38 @@ void VescMotor::reconfigure(MotorConfig& config, uint32_t /*level*/)
   {
     if (!boost::dynamic_pointer_cast<vesc_driver::VescDriverMockup>(driver_))
     {
-      driver_.reset(new vesc_driver::VescDriverMockup(boost::bind(&VescMotor::stateCB, this, _1)));
+      driver_.reset(new vesc_driver::VescDriverMockup(execution_duration_, boost::bind(&VescMotor::stateCB, this, _1)));
     }
   }
   else
   {
-    if (!boost::dynamic_pointer_cast<vesc_driver::VescDriver>(driver_))
+    if (!boost::dynamic_pointer_cast<vesc_driver::VescDriverSerial>(driver_))
     {
-      driver_.reset(new vesc_driver::VescDriver(private_nh_, boost::bind(&VescMotor::servoSensorCB, this, _1),
-                                                boost::bind(&VescMotor::stateCB, this, _1)));
+      int controller_id;
+      private_nh_.getParam("controller_id", controller_id);
+      std::string port;
+      private_nh_.getParam("port", port);
+      driver_.reset(new vesc_driver::VescDriverSerial(execution_duration_, boost::bind(&VescMotor::stateCB, this, _1),
+                                                      controller_id, port));
     }
   }
 }
 
-void VescMotor::servoSensorCB(const boost::shared_ptr<std_msgs::Float64>& /*servo_sensor_value*/)
-{
-}
-
-void VescMotor::stateCB(const boost::shared_ptr<vesc_msgs::VescStateStamped>& state)
+void VescMotor::stateCB(const vesc_driver::MotorControllerState& state)
 {
   boost::mutex::scoped_lock state_lock(state_mutex_);
 
-  if (predict(state->header.stamp)) // only correct if prediction can be performed
+  ros::Time now = ros::Time::now();
+  if (predict(now)) // only correct if prediction can be performed
   {
-    correct(state->state.speed / getVelocityConversionFactor());
+    correct(state.speed / getVelocityConversionFactor());
   }
   else
   {
     ROS_WARN("Skipping state correction due to failed prediction");
   }
 
-  supply_voltage_ = state->state.voltage_input;
+  supply_voltage_ = state.voltage_input;
 }
 
 double VescMotor::getVelocityConversionFactor() const

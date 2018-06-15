@@ -17,10 +17,10 @@ namespace vesc_differential_drive
 {
 VescDifferentialDrive::VescDifferentialDrive(ros::NodeHandle private_nh, const ros::NodeHandle& left_motor_private_nh,
                                              const ros::NodeHandle& right_motor_private_nh)
-  : initialized_(false), private_nh_(private_nh), reconfigure_server_(private_nh_), left_motor_(left_motor_private_nh),
-    left_motor_velocity_(0.), right_motor_(right_motor_private_nh), right_motor_velocity_(0.),
-    linear_velocity_odom_(0.),
-    angular_velocity_odom_(0.), x_odom_(0.), y_odom_(0.), yaw_odom_(0.)
+  : initialized_(false), private_nh_(private_nh), reconfigure_server_(private_nh_),
+    left_motor_(left_motor_private_nh, 1.0 / (config_.odometry_rate * 2.1)), left_motor_velocity_(0.),
+    right_motor_(right_motor_private_nh, 1.0 / (config_.odometry_rate * 2.1)), right_motor_velocity_(0.),
+    linear_velocity_odom_(0.), angular_velocity_odom_(0.), x_odom_(0.), y_odom_(0.), yaw_odom_(0.)
 {
   reconfigure_server_.setCallback(boost::bind(&VescDifferentialDrive::reconfigure, this, _1, _2));
 
@@ -33,8 +33,6 @@ VescDifferentialDrive::VescDifferentialDrive(ros::NodeHandle private_nh, const r
 
   odom_timer_ = private_nh_.createTimer(ros::Duration(1.0 / config_.odometry_rate),
                                         &VescDifferentialDrive::odomTimerCB, this);
-  query_timer_ = private_nh_.createTimer(ros::Duration(1.0 / (config_.odometry_rate * 2.1)),
-                                         &VescDifferentialDrive::queryTimerCB, this);
 
   battery_voltage_pub_ = private_nh_.advertise<std_msgs::Float32>("/battery_voltage", 1);
 
@@ -94,20 +92,6 @@ void VescDifferentialDrive::reconfigure(DifferentialDriveConfig& config, uint32_
   }
 
   config_ = config;
-}
-
-void VescDifferentialDrive::queryTimerCB(const ros::TimerEvent& /*event*/)
-{
-  if (initialized_)
-  {
-    if (!left_motor_.executionCycle() || !right_motor_.executionCycle())
-    {
-      ROS_FATAL("Motor driver encountered fault in execution cycle");
-      odom_timer_.stop();
-      query_timer_.stop();
-      ros::shutdown();
-    }
-  }
 }
 
 void VescDifferentialDrive::odomTimerCB(const ros::TimerEvent& event)

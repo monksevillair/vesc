@@ -27,7 +27,6 @@ public:
 private:
   void reconfigure(DifferentialDriveConfig& config, uint32_t level);
   void commandVelocityCB(const geometry_msgs::Twist &cmd_vel);
-  void queryTimerCB(const ros::TimerEvent& event);
   void odomTimerCB(const ros::TimerEvent& event);
   void updateOdometry(const ros::Time &time);
   void publishOdom();
@@ -72,11 +71,7 @@ private:
 
   ros::Subscriber cmd_vel_sub_;
 
-  ros::Timer query_timer_;
-
   ros::Timer odom_timer_;
-
-  ros::Timer voltage_timer_;
 };
 }
 

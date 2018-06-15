@@ -19,13 +19,14 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <opencv2/video/tracking.hpp>
 #include <vesc_differential_drive/MotorConfig.h>
 #include <vesc_driver/vesc_driver_interface.h>
+#include <chrono>
 
 namespace vesc_differential_drive
 {
 class VescMotor
 {
 public:
-  explicit VescMotor(const ros::NodeHandle& private_nh);
+  VescMotor(const ros::NodeHandle& private_nh, double execution_duration);
 
   /**
    * Gets the current motor velocity in rad/s, estimated at the given time.
@@ -52,17 +53,9 @@ public:
    */
   double getSupplyVoltage();
 
-  /**
-   * Requests an information update from the motor controller. Initializes the motor controller if it is not already
-   * initialized.
-   * @return true on success, false on error (e.g., if the motor controller has been disconnected).
-   */
-  bool executionCycle();
-
 private:
   void reconfigure(MotorConfig& config, uint32_t level);
-  void servoSensorCB(const boost::shared_ptr<std_msgs::Float64>& servo_sensor_value);
-  void stateCB(const boost::shared_ptr<vesc_msgs::VescStateStamped>& state);
+  void stateCB(const vesc_driver::MotorControllerState& state);
   double getVelocityConversionFactor() const;
 
   bool predict(const ros::Time &time);
@@ -71,6 +64,8 @@ private:
   ros::NodeHandle private_nh_;
   dynamic_reconfigure::Server<MotorConfig> reconfigure_server_;
   MotorConfig config_;
+
+  std::chrono::duration<double> execution_duration_;
 
   boost::mutex driver_mutex_;
   boost::shared_ptr<vesc_driver::VescDriverInterface> driver_;
