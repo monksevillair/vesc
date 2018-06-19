@@ -89,6 +89,11 @@ namespace vesc_driver
     serial_transport_->submit(std::forward<TransportRequest>(request));
   }
 
+  std::shared_ptr<SerialTransport> VescDriverSerial::getSerialTransport()
+  {
+    return serial_transport_;
+  }
+
   void VescDriverSerial::execution()
   {
     if (!initialized_)

@@ -36,6 +36,8 @@ namespace vesc_driver
 
     void setPosition(double position) override;
 
+    std::shared_ptr<SerialTransport> getSerialTransport();
+
   protected:
     class PacketVariantVisitor : public boost::static_visitor<>
     {
