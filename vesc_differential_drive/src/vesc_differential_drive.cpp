@@ -12,6 +12,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <nav_msgs/Odometry.h>
 #include <angles/angles.h>
 #include <std_msgs/Float32.h>
+#include <vesc_differential_drive/vesc_transport_factory.h>
 
 namespace vesc_differential_drive
 {
@@ -22,6 +23,13 @@ VescDifferentialDrive::VescDifferentialDrive(ros::NodeHandle private_nh, const r
     right_motor_(right_motor_private_nh, 1.0 / (config_.odometry_rate * 2.1)), right_motor_velocity_(0.),
     linear_velocity_odom_(0.), angular_velocity_odom_(0.), x_odom_(0.), y_odom_(0.), yaw_odom_(0.)
 {
+  if (private_nh_.hasParam("transport_mapping"))
+  {
+    std::shared_ptr<VescTransportFactory> transport_factory = std::make_shared<VescTransportFactory>(private_nh_);
+    left_motor_.setTransportFactory(transport_factory);
+    right_motor_.setTransportFactory(transport_factory);
+  }
+
   reconfigure_server_.setCallback(boost::bind(&VescDifferentialDrive::reconfigure, this, _1, _2));
 
   if (config_.publish_odom)

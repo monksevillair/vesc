@@ -81,7 +81,7 @@ include_directories(
 add_library(${PROJECT_NAME}
   src/vesc_differential_drive.cpp include/${PROJECT_NAME}/vesc_differential_drive.h
   src/vesc_motor.cpp include/${PROJECT_NAME}/vesc_motor.h
-)
+        src/vesc_transport_factory.cpp include/vesc_differential_drive/vesc_transport_factory.h)
 
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}

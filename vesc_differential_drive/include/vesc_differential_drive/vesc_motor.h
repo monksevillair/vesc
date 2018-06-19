@@ -20,6 +20,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <vesc_differential_drive/MotorConfig.h>
 #include <vesc_driver/vesc_driver_interface.h>
 #include <chrono>
+#include <vesc_differential_drive/vesc_transport_factory.h>
 
 namespace vesc_differential_drive
 {
@@ -53,6 +54,8 @@ public:
    */
   double getSupplyVoltage();
 
+  void setTransportFactory(std::shared_ptr<VescTransportFactory> transport_factory);
+
 private:
   void reconfigure(MotorConfig& config, uint32_t level);
   void stateCB(const vesc_driver::MotorControllerState& state);
@@ -64,6 +67,8 @@ private:
   ros::NodeHandle private_nh_;
   dynamic_reconfigure::Server<MotorConfig> reconfigure_server_;
   MotorConfig config_;
+
+  std::shared_ptr<VescTransportFactory> transport_factory_;
 
   std::chrono::duration<double> execution_duration_;
 

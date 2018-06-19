@@ -16,7 +16,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 namespace vesc_differential_drive
 {
 VescMotor::VescMotor(const ros::NodeHandle& private_nh, double execution_duration)
-  : private_nh_(private_nh), reconfigure_server_(private_nh), execution_duration_(execution_duration),
+  : private_nh_(private_nh), reconfigure_server_(private_nh_), execution_duration_(execution_duration),
     supply_voltage_(std::numeric_limits<double>::quiet_NaN())
 {
   reconfigure_server_.setCallback(boost::bind(&VescMotor::reconfigure, this, _1, _2));
@@ -82,6 +82,11 @@ double VescMotor::getSupplyVoltage()
   return supply_voltage_;
 }
 
+void VescMotor::setTransportFactory(std::shared_ptr<VescTransportFactory> transport_factory)
+{
+  transport_factory_ = transport_factory;
+}
+
 void VescMotor::reconfigure(MotorConfig& config, uint32_t /*level*/)
 {
   boost::mutex::scoped_lock driver_lock(driver_mutex_);
@@ -107,10 +112,23 @@ void VescMotor::reconfigure(MotorConfig& config, uint32_t /*level*/)
     {
       int controller_id;
       private_nh_.getParam("controller_id", controller_id);
-      std::string port;
-      private_nh_.getParam("port", port);
-      driver_.reset(new vesc_driver::VescDriverSerial(execution_duration_, boost::bind(&VescMotor::stateCB, this, _1),
-                                                      controller_id, port));
+
+      if (private_nh_.hasParam("port"))
+      {
+        std::string port;
+        private_nh_.getParam("port", port);
+        driver_.reset(new vesc_driver::VescDriverSerial(execution_duration_, boost::bind(&VescMotor::stateCB, this, _1),
+                                                        controller_id, port));
+      }
+      else
+      {
+        std::string transport_name;
+        private_nh_.getParam("transport_name", transport_name);
+
+        std::shared_ptr<vesc_driver::SerialTransport> transport = transport_factory_->getSerialTransport(transport_name);
+        driver_.reset(new vesc_driver::VescDriverSerial(execution_duration_, boost::bind(&VescMotor::stateCB, this, _1),
+                                                        controller_id, transport));
+      }
     }
   }
 }
