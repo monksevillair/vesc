@@ -17,7 +17,12 @@ int main(int argc, char** argv)
   const ros::NodeHandle private_nh("~");
   const ros::NodeHandle left_motor_private_nh(private_nh, "left_motor");
   const ros::NodeHandle right_motor_private_nh(private_nh, "right_motor");
+
+  ROS_DEBUG_STREAM("main::1");
+
   vesc_differential_drive::VescDifferentialDrive vdd(private_nh, left_motor_private_nh, right_motor_private_nh);
+
+  ROS_DEBUG_STREAM("main::2");
 
   ros::spin();
 

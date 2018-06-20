@@ -72,7 +72,7 @@ namespace vesc_driver
 
     void readPayloadSize(size_t bytes, ByteBuffer &buffer);
 
-    void readPayload(size_t size, uint16_t buffer, ByteBuffer byteBuffer);
+    void readPayload(size_t size, uint16_t buffer, ByteBuffer &byteBuffer);
 
     bool performCRCCheck(const ByteBuffer &buffer, uint16_t expected_crc_value);
 

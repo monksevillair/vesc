@@ -8,6 +8,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
  */
 
 #include <vesc_driver/vesc_driver_serial.h>
+#include <ros/ros.h>
 
 namespace vesc_driver
 {
@@ -17,13 +18,20 @@ namespace vesc_driver
       VescDriverInterface(state_handler_function), PeriodicExecution(sleep_duration),
       packet_visitor_(std::bind(&VescDriverSerial::receiveFirmwareVersion, this, std::placeholders::_1),
                       std::bind(&VescDriverSerial::receiveMotorControllerStateCB, this, std::placeholders::_1)),
-      initialized_(false), major_fw_version_(0), minor_fw_version_(0), controller_id_(controller_id)
+      initialized_(false), wait_for_response_(false), major_fw_version_(0), minor_fw_version_(0),
+      controller_id_(controller_id)
   {
+    ROS_DEBUG_STREAM("VescDriverSerial::VescDriverSerial::1;" << static_cast<int>(controller_id_));
+
     serial_transport_ = std::make_shared<SerialTransport>(controller_id);
+    ROS_DEBUG_STREAM("VescDriverSerial::VescDriverSerial::2;" << static_cast<int>(controller_id_));
+
     serial_transport_->registerPacketHandler(controller_id, std::bind(&VescDriverSerial::processPacketVariant, this,
                                                                      std::placeholders::_1));
+    ROS_DEBUG_STREAM("VescDriverSerial::VescDriverSerial::3;" << static_cast<int>(controller_id_));
 
     serial_transport_->connect(port);
+    ROS_DEBUG_STREAM("VescDriverSerial::VescDriverSerial::4;" << static_cast<int>(controller_id_));
   }
 
   VescDriverSerial::VescDriverSerial(const std::chrono::duration<double> &sleep_duration,
@@ -33,7 +41,8 @@ namespace vesc_driver
       serial_transport_(serial_transport),
       packet_visitor_(std::bind(&VescDriverSerial::receiveFirmwareVersion, this, std::placeholders::_1),
                       std::bind(&VescDriverSerial::receiveMotorControllerStateCB, this, std::placeholders::_1)),
-      initialized_(false), major_fw_version_(0), minor_fw_version_(0), controller_id_(controller_id)
+      initialized_(false), wait_for_response_(false), major_fw_version_(0), minor_fw_version_(0),
+      controller_id_(controller_id)
   {
     serial_transport_->registerPacketHandler(controller_id, std::bind(&VescDriverSerial::processPacketVariant, this,
                                                                       std::placeholders::_1));
@@ -71,6 +80,7 @@ namespace vesc_driver
 
   void VescDriverSerial::setSpeed(double speed)
   {
+    ROS_DEBUG_STREAM("VescDriverSerial::setSpeed::1;" << controller_id_ << " speed: " << speed);
     SetSpeedPacket packet;
     packet.speed = speed;
 
@@ -96,35 +106,69 @@ namespace vesc_driver
 
   void VescDriverSerial::execution()
   {
+    ROS_DEBUG_STREAM("VescDriverSerial::execution::1;" << static_cast<int>(controller_id_));
+
+    if (!serial_transport_ || !serial_transport_->isConnected())
+      return;
+
+    std::lock_guard<std::mutex> wait_for_response_lock(wait_for_response_mutex_);
+
+    if (wait_for_response_)
+      return;
+
     if (!initialized_)
     {
+      ROS_DEBUG_STREAM("VescDriverSerial::execution::2;" << static_cast<int>(controller_id_));
+
       GetFirmwareVersion packet;
 
       TransportRequest request(controller_id_, packet, true);
 
+      ROS_DEBUG_STREAM("VescDriverSerial::execution::3;" << static_cast<int>(controller_id_));
+
       serial_transport_->submit(std::forward<TransportRequest>(request));
+      ROS_DEBUG_STREAM("VescDriverSerial::execution::4;" << static_cast<int>(controller_id_));
+
+      wait_for_response_ = true;
     }
     else
     {
+      ROS_DEBUG_STREAM("VescDriverSerial::execution::5;" << static_cast<int>(controller_id_));
+
       GetValuesPacket packet;
 
       TransportRequest request(controller_id_, packet, true);
 
+      ROS_DEBUG_STREAM("VescDriverSerial::execution::6;" << static_cast<int>(controller_id_));
+
       serial_transport_->submit(std::forward<TransportRequest>(request));
+      ROS_DEBUG_STREAM("VescDriverSerial::execution::7;" << static_cast<int>(controller_id_));
+
+      wait_for_response_ = true;
     }
   }
 
   void VescDriverSerial::receiveFirmwareVersion(const FirmwareVersion &fw_version)
   {
+    ROS_DEBUG_STREAM("VescDriverSerial::receiveFirmwareVersion::1");
     major_fw_version_ = fw_version.major_version;
     minor_fw_version_ = fw_version.minor_version;
 
     initialized_ = true;
+    ROS_DEBUG_STREAM("VescDriverSerial::receiveFirmwareVersion::2");
+
+    std::lock_guard<std::mutex> wait_for_response_lock(wait_for_response_mutex_);
+
+    wait_for_response_ = false;    
   }
 
   void VescDriverSerial::receiveMotorControllerStateCB(const MotorControllerState& state)
   {
     state_handler_function_(state);
+
+    std::lock_guard<std::mutex> wait_for_response_lock(wait_for_response_mutex_);
+
+    wait_for_response_ = false;    
   }
 
   VescDriverSerial::PacketVariantVisitor::PacketVariantVisitor(
@@ -166,6 +210,8 @@ namespace vesc_driver
 
   void VescDriverSerial::PacketVariantVisitor::operator()(const MotorControllerState &packet)
   {
+    ROS_DEBUG_STREAM("VescDriverSerial::PacketVariantVisitor::operator<MotorControllerState>::1");
+
     receive_motor_controller_state_cb_(packet);
   }
 

@@ -15,6 +15,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <boost/optional.hpp>
 #include <cstdint>
 #include <boost/crc.hpp>
+#include <ros/ros.h>
 
 namespace vesc_driver
 {
@@ -24,6 +25,7 @@ namespace vesc_driver
     virtual void encode(const PacketVariant& packet, ByteBuffer& buffer)
     {
       Encoder encoder(buffer);
+      ROS_DEBUG_STREAM("SerialPacketCodec::encode packet type: " << packet.type().name());
       boost::apply_visitor(encoder, packet);
     }
 

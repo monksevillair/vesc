@@ -8,6 +8,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
  */
 
 #include <vesc_driver/serial_packet_codec.h>
+#include <ros/ros.h>
 
 namespace vesc_driver
 {
@@ -19,12 +20,15 @@ namespace vesc_driver
 
     ByteBuffer parsing_buffer = buffer;
     uint8_t payload_id = parsing_buffer.parsUnsignedInt8();
+    ROS_DEBUG_STREAM("SerialPacketCodec::decode : payload_id: " << static_cast<int>(payload_id));    
     switch (payload_id)
     {
       case Encoder::VESC_GET_VALUES_POSITION_PACKET:
+        ROS_DEBUG_STREAM("SerialPacketCodec::decode : Encoder::VESC_GET_VALUES_POSITION_PACKET");
         return decodeMotorControllerState(parsing_buffer);
 
       case Encoder::VESC_GET_FW_VERSION_PACKET:
+        ROS_DEBUG_STREAM("SerialPacketCodec::decode : Encoder::VESC_GET_FW_VERSION_PACKET");
         return decodeFirmwareVersion(parsing_buffer);
 
       default:
@@ -102,6 +106,12 @@ namespace vesc_driver
     setPayloadID(VESC_SET_SPEED_PACKET);
     buffer_.addFloat32(static_cast<float>(packet.speed));
     addCRC();
+
+    ROS_DEBUG_STREAM("SerialPacketCodec::Encoder::operator<SetSpeedPacket>");
+
+    std::vector<uint8_t> encoded_bytes = buffer_;
+    for (auto byte : encoded_bytes)
+          ROS_DEBUG_STREAM("SerialPacketCodec::Encoder::operator<SetSpeedPacket> encoded_bytes: " << static_cast<int>(byte));     
   }
 
   void SerialPacketCodec::Encoder::operator()(const SetPositionPacket &packet)
@@ -117,6 +127,12 @@ namespace vesc_driver
     createHeader(VESC_GET_VALUES_PACKET_PAYLOAD_SIZE);
     setPayloadID(VESC_GET_VALUES_POSITION_PACKET);
     addCRC();
+
+    ROS_DEBUG_STREAM("SerialPacketCodec::Encoder::operator<GetValuesPacket>");
+
+    std::vector<uint8_t> encoded_bytes = buffer_;
+    for (auto byte : encoded_bytes)
+          ROS_DEBUG_STREAM("SerialPacketCodec::Encoder::operator<GetValuesPacket> encoded_bytes: " << static_cast<int>(byte)); 
   }
 
   void SerialPacketCodec::Encoder::operator()(const MotorControllerState &packet)
@@ -129,6 +145,12 @@ namespace vesc_driver
     createHeader(VESC_GET_FW_VERSION_PACKET_PAYLOAD_SIZE);
     setPayloadID(VESC_GET_FW_VERSION_PACKET);
     addCRC();
+
+    ROS_DEBUG_STREAM("SerialPacketCodec::Encoder::operator<GetFirmwareVersion>");    
+
+    std::vector<uint8_t> encoded_bytes = buffer_;
+    for (auto byte : encoded_bytes)
+          ROS_DEBUG_STREAM("SerialPacketCodec::Encoder::operator<GetFirmwareVersion> encoded_bytes: " << static_cast<int>(byte));     
   }
 
   void SerialPacketCodec::Encoder::operator()(const FirmwareVersion &packet)

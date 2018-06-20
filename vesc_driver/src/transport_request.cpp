@@ -8,13 +8,16 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
  */
 
 #include <vesc_driver/transport_request.h>
+#include <ros/ros.h>
 
 namespace vesc_driver
 {
   TransportRequest::TransportRequest(uint8_t controller_id, vesc_driver::PacketVariant &&packet, bool expect_response)
       : controller_id_(controller_id), packet_(std::forward<vesc_driver::PacketVariant>(packet)),
         expect_response_(expect_response)
-  { }
+  { 
+    ROS_DEBUG_STREAM("TransportRequest::TransportRequest packet type: " << packet_.type().name());
+  }
 
   uint8_t TransportRequest::getControllerId()
   {

@@ -9,6 +9,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 #include <vesc_driver/byte_buffer.h>
 #include <utility>
+#include <ros/ros.h>
 
 namespace vesc_driver
 {
@@ -21,11 +22,11 @@ namespace vesc_driver
 
   void ByteBuffer::addBytes(const std::vector<uint8_t> &input_bytes)
   {
-    std::vector<uint8_t>::iterator it_to_insert = buffer_.begin();
-    if (!buffer_.empty())
-      it_to_insert += buffer_.size() - 1;
+    buffer_.insert(buffer_.end(), input_bytes.begin(), input_bytes.end());
 
-    buffer_.insert(it_to_insert, input_bytes.begin(), input_bytes.end());
+    ROS_DEBUG_STREAM("ByteBuffer::addBytes::1");
+    for (auto byte : input_bytes)
+          ROS_DEBUG_STREAM("ByteBuffer::addBytes::1.1 input_bytes: " << static_cast<int>(byte));    
   }
 
   size_t ByteBuffer::getSize() const
@@ -44,7 +45,9 @@ namespace vesc_driver
     uint8_t result = 0;
     size_t new_parsing_index;
 
-    if ((buffer_.size() - 1) > parsing_index_)
+    ROS_DEBUG_STREAM("ByteBuffer::parsUnsignedInt8::1 parsing_index_: " << parsing_index_);
+
+    if ((buffer_.size() - 1) < parsing_index_)
     {
       new_parsing_index = buffer_.size();
     }
@@ -56,6 +59,8 @@ namespace vesc_driver
 
     parsing_index_= new_parsing_index;
 
+    ROS_DEBUG_STREAM("ByteBuffer::parsUnsignedInt8::2 parsing_index_: " << parsing_index_);
+
     return result;
   }
 
@@ -64,7 +69,7 @@ namespace vesc_driver
     uint16_t result = 0;
     size_t new_parsing_index;
 
-    if ((buffer_.size() - 1) > (parsing_index_ + 1))
+    if ((buffer_.size() - 1) < (parsing_index_ + 1))
     {
       new_parsing_index = buffer_.size();
     }
@@ -85,7 +90,7 @@ namespace vesc_driver
     uint32_t result = 0;
     size_t new_parsing_index;
 
-    if ((buffer_.size() - 1) > (parsing_index_ + 3))
+    if ((buffer_.size() - 1) < (parsing_index_ + 3))
     {
       new_parsing_index = buffer_.size();
     }
@@ -135,6 +140,8 @@ namespace vesc_driver
 
   bool ByteBuffer::canFurtherPars()
   {
+    ROS_DEBUG_STREAM("ByteBuffer::canFurtherPars::1 parsing_index_: " << parsing_index_ << " buffer_.size(): " << buffer_.size());
+
     return parsing_index_ < buffer_.size();
   }
 

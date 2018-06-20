@@ -9,6 +9,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 #include <vesc_driver/serial_transport.h>
 #include <stdexcept>
+#include <ros/ros.h>
 
 namespace vesc_driver
 {
@@ -23,13 +24,18 @@ namespace vesc_driver
 
   void SerialTransport::submit(TransportRequest &&r)
   {
+    ROS_DEBUG_STREAM("SerialTransport::submit packet type: " << r.getPacket().type().name());
+
     write_queue_.push(std::forward<TransportRequest>(r));
   }
 
   void SerialTransport::connect(const std::string &port)
   {
     if (isConnected())
+    {
+      ROS_ERROR_STREAM("Try to connect to " << port << " when a connection already exists");
       throw std::logic_error("Try to connect to " + port + " when a connection already exists");
+    }
 
     stopThreads();
 
@@ -40,6 +46,7 @@ namespace vesc_driver
     }
     catch (const std::exception& e)
     {
+      ROS_ERROR_STREAM("Encountered error during opening to port " << port << " error: " << e.what());
       throw std::runtime_error("Encountered error during opening to port " + port + " error: " + e.what());
     }
 
@@ -81,14 +88,22 @@ namespace vesc_driver
 
   void SerialTransport::readLoop()
   {
+    ROS_DEBUG_STREAM("SerialTransport::readLoop::1");
+
     while(should_read_)
     {
+      ROS_DEBUG_STREAM("SerialTransport::readLoop::2");
+
       ByteBuffer read_buffer;
       readStartByte(read_buffer);
       if (!should_read_)
         break;
 
+      ROS_DEBUG_STREAM("SerialTransport::readLoop::3");
+
       uint8_t start_byte = read_buffer.parsUnsignedInt8();
+
+      ROS_DEBUG_STREAM("SerialTransport::readLoop::4");
 
       size_t payload_size_bytes;
       if (start_byte == SerialPacketCodec::VESC_SMALL_FRAME)
@@ -97,12 +112,19 @@ namespace vesc_driver
         payload_size_bytes = 2;
       else
       {
+        ROS_DEBUG_STREAM("SerialTransport::readLoop::5");
+
         //skipping invalid input
         continue;
       }
+
+      ROS_DEBUG_STREAM("SerialTransport::readLoop::6 payload_size_bytes: " << payload_size_bytes);
+
       readPayloadSize(payload_size_bytes, read_buffer);
       if (!should_read_)
         break;
+
+      ROS_DEBUG_STREAM("SerialTransport::readLoop::7");
 
       uint16_t payload_size;
       if (start_byte == SerialPacketCodec::VESC_SMALL_FRAME)
@@ -110,50 +132,82 @@ namespace vesc_driver
       else if (start_byte == SerialPacketCodec::VESC_LARGE_FRAME)
         payload_size = read_buffer.parsUnsignedInt16();
 
+      ROS_DEBUG_STREAM("SerialTransport::readLoop::8 payload_size: " << static_cast<int>(payload_size));
+
       readPayload(payload_size_bytes, payload_size, read_buffer);
       if (!should_read_)
         break;
+
+      ROS_DEBUG_STREAM("SerialTransport::readLoop::9");
+      ROS_DEBUG_STREAM("SerialTransport::readLoop::9.1 payload_size_bytes: " << payload_size_bytes << " payload_size: " << payload_size << " read_buffer.size()" << read_buffer.getSize());
+      std::vector<uint8_t> read_bytes = read_buffer;
+      for (auto byte : read_bytes)
+            ROS_DEBUG_STREAM("SerialTransport::readLoop::9.2 read_bytes: " << static_cast<int>(byte));    
 
       read_buffer.reverseAdvanceTo(0);
       uint8_t eof_byte = read_buffer.parsUnsignedInt8();
       if (eof_byte != SerialPacketCodec::VESC_EOF_BYTE)
       {
+        ROS_DEBUG_STREAM("SerialTransport::readLoop::10");
+
         //skipping invalid input
         continue;
       }
+
+      ROS_DEBUG_STREAM("SerialTransport::readLoop::11");
 
       read_buffer.reverseAdvanceTo(2);
       uint16_t crc_value = read_buffer.parsUnsignedInt16();
 
+      ROS_DEBUG_STREAM("SerialTransport::readLoop::12");
+
       ByteBuffer payload = extractPayload(payload_size_bytes, payload_size, read_buffer);
       if(!performCRCCheck(payload, crc_value))
       {
+        ROS_DEBUG_STREAM("SerialTransport::readLoop::13");
+
         //skipping invalid input
         continue;
       }
+
+      ROS_DEBUG_STREAM("SerialTransport::readLoop::14");
 
       boost::optional<PacketVariant> paket = packet_codec_.decode(payload);
 
       if (!paket)
       {
+        ROS_DEBUG_STREAM("SerialTransport::readLoop::15");
+
         //skipping invalid input
         continue;
       }
 
       {
+        ROS_DEBUG_STREAM("SerialTransport::readLoop::16");
+
         std::unique_lock<std::mutex> should_respond_lock(should_respond_mutex_);
         if (should_respond_)
         {
+          ROS_DEBUG_STREAM("SerialTransport::readLoop::17");
+
           should_respond_ = false;
 
           std::lock_guard<std::mutex> pacekt_handler_lock(pacekt_handler_mutex_);
           if (packet_handlers_.find(respond_id_) == packet_handlers_.end())
           {
+            ROS_DEBUG_STREAM("SerialTransport::readLoop::18");
+
             // no packet handler registered
             continue;
           }
           else
+          {
+            ROS_DEBUG_STREAM("SerialTransport::readLoop::19");
+
             packet_handlers_[respond_id_](paket.get());
+          }
+
+          should_respond_condition_.notify_all();
         }
       }
     }
@@ -171,7 +225,12 @@ namespace vesc_driver
     {
       try
       {
+        ROS_DEBUG_STREAM("SerialTransport::writeLoop::1");
+
         TransportRequest request = write_queue_.pop();
+        ROS_DEBUG_STREAM("SerialTransport::writeLoop packet type: " << request.getPacket().type().name());
+
+        ROS_DEBUG_STREAM("SerialTransport::writeLoop::2");
 
         {
           std::unique_lock<std::mutex> should_respond_lock(should_respond_mutex_);
@@ -179,7 +238,11 @@ namespace vesc_driver
             should_respond_condition_.wait(should_respond_lock);
         }
 
+        ROS_DEBUG_STREAM("SerialTransport::writeLoop::3");
+
         ByteBuffer write_buffer;
+
+        ROS_DEBUG_STREAM("SerialTransport::writeLoop::4");
 
         if (request.getControllerId() == controller_id_)
           packet_codec_.encode(request.getPacket(), write_buffer);
@@ -189,17 +252,28 @@ namespace vesc_driver
         {
           std::unique_lock<std::mutex> should_respond_lock(should_respond_mutex_);
 
+          ROS_DEBUG_STREAM("SerialTransport::writeLoop::5");
+
           write(write_buffer);
+
+          ROS_DEBUG_STREAM("SerialTransport::writeLoop::6");
 
           if (request.expectResponse())
           {
+
+            ROS_DEBUG_STREAM("SerialTransport::writeLoop::7");
+
             should_respond_ = true;
             respond_id_ = request.getControllerId();
+
+            ROS_DEBUG_STREAM("SerialTransport::writeLoop::8");
           }
         }
       }
       catch (const InterruptException& exception)
       {
+        ROS_DEBUG_STREAM("SerialTransport::writeLoop::9");
+
         break;
       }
     }
@@ -223,16 +297,25 @@ namespace vesc_driver
   {
     while (should_read_)
     {
+      ROS_DEBUG_STREAM("SerialTransport::readStartByte::1");
+
       buffer.clear();
 
       readBytes(SerialPacketCodec::VESC_MIN_FRAME_SIZE, buffer);
+      ROS_DEBUG_STREAM("SerialTransport::readStartByte::2");
 
       while (buffer.canFurtherPars())
       {
+        ROS_DEBUG_STREAM("SerialTransport::readStartByte::3");
+
         uint8_t start_byte = buffer.parsUnsignedInt8();
+        ROS_DEBUG_STREAM("SerialTransport::readStartByte::4");
+        ROS_DEBUG_STREAM("SerialTransport::readStartByte::4.1 start_byte: " << static_cast<int>(start_byte));
 
         if ((start_byte == SerialPacketCodec::VESC_SMALL_FRAME) || (start_byte == SerialPacketCodec::VESC_LARGE_FRAME))
         {
+          ROS_DEBUG_STREAM("SerialTransport::readStartByte::5");
+
           buffer.reverseStep(1);
           buffer.reduceToParsingPoint();
           return;
@@ -243,21 +326,38 @@ namespace vesc_driver
 
   void SerialTransport::readBytes(const size_t size, ByteBuffer &buffer)
   {
-    size_t number_bytes_to_read = std::max(size, serial_port_.available());
+    ROS_DEBUG_STREAM("SerialTransport::readBytes::1");
+    ROS_DEBUG_STREAM("SerialTransport::readBytes::1.1 size: "<< size);
+
+    ROS_DEBUG_STREAM("SerialTransport::readBytes::2");
 
     size_t read_bytes = 0;
     while (should_read_ && (read_bytes < size))
     {
-      size_t remaining_bytes = number_bytes_to_read - read_bytes;
-      std::vector<uint8_t> bytes_to_read(remaining_bytes);
+      ROS_DEBUG_STREAM("SerialTransport::readBytes::3");
 
+      size_t remaining_bytes = size - read_bytes;
+      std::vector<uint8_t> bytes_to_read;
+      bytes_to_read.reserve(remaining_bytes);
+
+      ROS_DEBUG_STREAM("SerialTransport::readBytes::4 remaining_bytes: " << remaining_bytes);
       size_t new_read_bytes = serial_port_.read(bytes_to_read, remaining_bytes);
 
+      ROS_DEBUG_STREAM("SerialTransport::readBytes::5 new_read_bytes: " << new_read_bytes);
       if (new_read_bytes > 0)
         buffer.addBytes(bytes_to_read);
 
+      ROS_DEBUG_STREAM("SerialTransport::readBytes::6");
       read_bytes += new_read_bytes;
+
+
+      ROS_DEBUG_STREAM("SerialTransport::readBytes::7 read_bytes: " << read_bytes);
     }
+
+    ROS_DEBUG_STREAM("SerialTransport::readBytes::8");
+    std::vector<uint8_t> bytes_read = buffer;
+    for (auto byte : bytes_read)
+          ROS_DEBUG_STREAM("SerialTransport::readBytes::8.1 bytes_read: " << static_cast<int>(byte));
   }
 
   void SerialTransport::readPayloadSize(size_t bytes, ByteBuffer &buffer)
@@ -270,7 +370,7 @@ namespace vesc_driver
     }
   }
 
-  void SerialTransport::readPayload(size_t payload_size_bytes, uint16_t payload_size, ByteBuffer buffer)
+  void SerialTransport::readPayload(size_t payload_size_bytes, uint16_t payload_size, ByteBuffer &buffer)
   {
     // at lest start byte, payload size, payload, crc, eof byte needs to be read
     size_t needed_bytes = 1 + payload_size_bytes + payload_size + 2 + 1;

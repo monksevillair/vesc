@@ -23,41 +23,53 @@ VescDifferentialDrive::VescDifferentialDrive(ros::NodeHandle private_nh, const r
     right_motor_(right_motor_private_nh, 1.0 / (config_.odometry_rate * 2.1)), right_motor_velocity_(0.),
     linear_velocity_odom_(0.), angular_velocity_odom_(0.), x_odom_(0.), y_odom_(0.), yaw_odom_(0.)
 {
+  ROS_DEBUG_STREAM("VescDifferentialDrive::VescDifferentialDrive::1");
   if (private_nh_.hasParam("transport_mapping"))
   {
     std::shared_ptr<VescTransportFactory> transport_factory = std::make_shared<VescTransportFactory>(private_nh_);
     left_motor_.setTransportFactory(transport_factory);
     right_motor_.setTransportFactory(transport_factory);
   }
-
+  ROS_DEBUG_STREAM("VescDifferentialDrive::VescDifferentialDrive::2");
   reconfigure_server_.setCallback(boost::bind(&VescDifferentialDrive::reconfigure, this, _1, _2));
+  ROS_DEBUG_STREAM("VescDifferentialDrive::VescDifferentialDrive::3");
 
   if (config_.publish_odom)
   {
     odom_pub_ = private_nh_.advertise<nav_msgs::Odometry>("/odom", 1);
   }
+  ROS_DEBUG_STREAM("VescDifferentialDrive::VescDifferentialDrive::4");
 
   cmd_vel_sub_ = private_nh_.subscribe("/cmd_vel", 1, &VescDifferentialDrive::commandVelocityCB, this);
+  ROS_DEBUG_STREAM("VescDifferentialDrive::VescDifferentialDrive::5");
 
   odom_timer_ = private_nh_.createTimer(ros::Duration(1.0 / config_.odometry_rate),
                                         &VescDifferentialDrive::odomTimerCB, this);
+  ROS_DEBUG_STREAM("VescDifferentialDrive::VescDifferentialDrive::6");
 
   battery_voltage_pub_ = private_nh_.advertise<std_msgs::Float32>("/battery_voltage", 1);
+  ROS_DEBUG_STREAM("VescDifferentialDrive::VescDifferentialDrive::7");
 
   if (config_.publish_motor_speed)
   {
+    ROS_DEBUG_STREAM("VescDifferentialDrive::VescDifferentialDrive::8");
     left_motor_speed_pub_ = private_nh_.advertise<std_msgs::Float32>("/left_motor_speed", 1);
     right_motor_speed_pub_ = private_nh_.advertise<std_msgs::Float32>("/right_motor_speed", 1);
+    ROS_DEBUG_STREAM("VescDifferentialDrive::VescDifferentialDrive::9");
 
     left_velocity_pub_ = private_nh_.advertise<std_msgs::Float32>("/left_velocity", 1);
     right_velocity_pub_ = private_nh_.advertise<std_msgs::Float32>("/right_velocity", 1);
+    ROS_DEBUG_STREAM("VescDifferentialDrive::VescDifferentialDrive::10");
 
     left_motor_speed_send_pub_ = private_nh_.advertise<std_msgs::Float32>("/left_motor_speed_send", 1);
     right_motor_speed_send_pub_ = private_nh_.advertise<std_msgs::Float32>("/right_motor_speed_send", 1);
+    ROS_DEBUG_STREAM("VescDifferentialDrive::VescDifferentialDrive::11");
 
     left_velocity_send_pub_ = private_nh_.advertise<std_msgs::Float32>("/left_velocity_send", 1);
     right_velocity_send_pub_ = private_nh_.advertise<std_msgs::Float32>("/right_velocity_send", 1);
+    ROS_DEBUG_STREAM("VescDifferentialDrive::VescDifferentialDrive::12");
   }
+  ROS_DEBUG_STREAM("VescDifferentialDrive::VescDifferentialDrive::13");
 
   initialized_ = true;
 }
@@ -104,37 +116,58 @@ void VescDifferentialDrive::reconfigure(DifferentialDriveConfig& config, uint32_
 
 void VescDifferentialDrive::odomTimerCB(const ros::TimerEvent& event)
 {
+  ROS_DEBUG_STREAM("VescDifferentialDrive::odomTimerCB::1");
+
   if (initialized_)
   {
+    ROS_DEBUG_STREAM("VescDifferentialDrive::odomTimerCB::2");
+
     left_motor_velocity_ = left_motor_.getVelocity(event.current_real);
+    ROS_DEBUG_STREAM("VescDifferentialDrive::odomTimerCB::3");
+
     right_motor_velocity_ = right_motor_.getVelocity(event.current_real);
+    ROS_DEBUG_STREAM("VescDifferentialDrive::odomTimerCB::4");
+
     updateOdometry(event.current_real);
+    ROS_DEBUG_STREAM("VescDifferentialDrive::odomTimerCB::5");
+
     publishDoubleValue(left_motor_.getSupplyVoltage(), battery_voltage_pub_);
+    ROS_DEBUG_STREAM("VescDifferentialDrive::odomTimerCB::6");
   }
 }
 
 void VescDifferentialDrive::commandVelocityCB(const geometry_msgs::Twist& cmd_vel)
 {
+  ROS_DEBUG_STREAM("VescDifferentialDrive::commandVelocityCB::1");
+
   const double linear_velocity = ensureBounds(cmd_vel.linear.x, config_.max_velocity_linear);
   const double angular_velocity = ensureBounds(cmd_vel.angular.z, config_.max_velocity_angular);
+  ROS_DEBUG_STREAM("VescDifferentialDrive::commandVelocityCB::2");
 
   const double left_tangential_velocity = (linear_velocity - angular_velocity * 0.5 * config_.track_width);
   const double right_tangential_velocity = (linear_velocity + angular_velocity * 0.5 * config_.track_width);
+  ROS_DEBUG_STREAM("VescDifferentialDrive::commandVelocityCB::3");
 
   if (config_.publish_motor_speed)
   {
+    ROS_DEBUG_STREAM("VescDifferentialDrive::commandVelocityCB::4");
+
     publishDoubleValue(left_tangential_velocity, left_velocity_send_pub_);
     publishDoubleValue(right_tangential_velocity, right_velocity_send_pub_);
   }
+  ROS_DEBUG_STREAM("VescDifferentialDrive::commandVelocityCB::5");
 
   const double left_rotational_velocity = left_tangential_velocity / (0.5 * config_.wheel_diameter);
   const double right_rotational_velocity = right_tangential_velocity / (0.5 * config_.wheel_diameter);
+  ROS_DEBUG_STREAM("VescDifferentialDrive::commandVelocityCB::6");
 
   if ((std::fabs(left_rotational_velocity) <= config_.brake_velocity)
     && (std::fabs(right_rotational_velocity) <= config_.brake_velocity)
     && (std::fabs(left_motor_velocity_) <= config_.allowed_brake_velocity)
     && (std::fabs(right_motor_velocity_) <= config_.allowed_brake_velocity))
   {
+    ROS_DEBUG_STREAM("VescDifferentialDrive::commandVelocityCB::7");
+
     ROS_DEBUG_STREAM("brake due to"
                        << " left_rotational_velocity: " << left_rotational_velocity
                        << " right_rotational_velocity: " << right_rotational_velocity
@@ -145,11 +178,15 @@ void VescDifferentialDrive::commandVelocityCB(const geometry_msgs::Twist& cmd_ve
   }
   else
   {
+    ROS_DEBUG_STREAM("VescDifferentialDrive::commandVelocityCB::8");
+
     left_motor_.setVelocity(left_rotational_velocity);
     right_motor_.setVelocity(right_rotational_velocity);
 
     if (config_.publish_motor_speed)
     {
+      ROS_DEBUG_STREAM("VescDifferentialDrive::commandVelocityCB::9");
+
       publishDoubleValue(left_rotational_velocity, left_motor_speed_send_pub_);
       publishDoubleValue(right_rotational_velocity, right_motor_speed_send_pub_);
     }

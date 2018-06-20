@@ -79,6 +79,9 @@ namespace vesc_driver
 
     std::atomic<bool> initialized_;
 
+    std::mutex wait_for_response_mutex_;
+    bool wait_for_response_;
+
     uint8_t major_fw_version_;
     uint8_t minor_fw_version_;
 
