@@ -86,7 +86,7 @@ namespace vesc_driver
       constexpr static uint8_t VESC_GET_FW_VERSION_PACKET=0;
 
       constexpr static uint8_t VESC_FOWARD_CAN_PAYLOAD_SIZE=2;
-      constexpr static uint8_t VESC_FOWARD_CAN=27;
+      constexpr static uint8_t VESC_FOWARD_CAN=34;
     protected:
       ByteBuffer& buffer_;
       uint16_t payload_size_;

@@ -200,6 +200,10 @@ namespace vesc_driver
 
   void SerialPacketCodec::Encoder::fowardCan(uint8_t can_id)
   {
+    std::vector<uint8_t> encoded_bytes = buffer_;
+    for (auto byte : encoded_bytes)
+          ROS_DEBUG_STREAM("SerialPacketCodec::Encoder::fowardCanen::1 coded_bytes: " << static_cast<int>(byte)); 
+
     buffer_.resetParsing();
     uint8_t start_byte = buffer_.parsUnsignedInt8();
 
@@ -226,6 +230,10 @@ namespace vesc_driver
     buffer_.addUnsigedInt8(can_id);
     buffer_.addBytes(original_bytes);
     addCRC();
+
+    encoded_bytes = buffer_;
+    for (auto byte : encoded_bytes)
+          ROS_DEBUG_STREAM("SerialPacketCodec::Encoder::fowardCan::2 encoded_bytes: " << static_cast<int>(byte));     
   }
 
 }

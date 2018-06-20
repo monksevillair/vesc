@@ -18,8 +18,7 @@ namespace vesc_driver
                                                             serial_port_(std::string(), 115200,
                                                                          serial::Timeout::simpleTimeout(100),
                                                                          serial::eightbits, serial::parity_none,
-                                                                         serial::stopbits_one, serial::flowcontrol_none),
-                                                            write_thread_(&SerialTransport::writeLoop, this)
+                                                                         serial::stopbits_one, serial::flowcontrol_none)
   { }
 
   void SerialTransport::submit(TransportRequest &&r)
@@ -52,6 +51,10 @@ namespace vesc_driver
 
     should_read_ = true;
     read_thread_ = std::thread(&SerialTransport::readLoop, this);
+
+
+    should_write_ = true;
+    write_thread_ = std::thread(&SerialTransport::writeLoop, this);    
   }
 
   bool SerialTransport::isConnected()

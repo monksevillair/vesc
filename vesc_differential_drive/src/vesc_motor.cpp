@@ -15,8 +15,8 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_differential_drive
 {
-VescMotor::VescMotor(const ros::NodeHandle& private_nh, double execution_duration)
-  : private_nh_(private_nh), reconfigure_server_(private_nh_), execution_duration_(execution_duration),
+VescMotor::VescMotor(const ros::NodeHandle& private_nh, std::shared_ptr<VescTransportFactory> transport_factory, double execution_duration)
+  : private_nh_(private_nh), reconfigure_server_(private_nh_), transport_factory_(transport_factory), execution_duration_(execution_duration),
     supply_voltage_(std::numeric_limits<double>::quiet_NaN())
 {
   ROS_DEBUG_STREAM("VescMotor::VescMotor::1");
@@ -92,11 +92,6 @@ double VescMotor::getSupplyVoltage()
 {
   boost::mutex::scoped_lock state_lock(state_mutex_);
   return supply_voltage_;
-}
-
-void VescMotor::setTransportFactory(std::shared_ptr<VescTransportFactory> transport_factory)
-{
-  transport_factory_ = transport_factory;
 }
 
 void VescMotor::reconfigure(MotorConfig& config, uint32_t /*level*/)

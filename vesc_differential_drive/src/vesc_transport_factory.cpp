@@ -13,11 +13,11 @@ namespace vesc_differential_drive
 {
   VescTransportFactory::VescTransportFactory(const ros::NodeHandle &nh) : nh_(nh)
   {
-    ROS_INFO_STREAM("VescTransportFactory::VescTransportFactory::1");
+    ROS_DEBUG_STREAM("VescTransportFactory::VescTransportFactory::1");
 
     if (nh_.hasParam("transport_mapping"))
     {
-      ROS_INFO_STREAM("VescTransportFactory::VescTransportFactory::2");
+      ROS_DEBUG_STREAM("VescTransportFactory::VescTransportFactory::2");
 
       XmlRpc::XmlRpcValue transport_mappings;
       nh_.getParam("transport_mapping", transport_mappings);
@@ -25,10 +25,10 @@ namespace vesc_differential_drive
       if (transport_mappings.getType() != XmlRpc::XmlRpcValue::TypeArray)
         throw std::invalid_argument("transport mappings has wrong type");
 
-      ROS_INFO_STREAM("VescTransportFactory::VescTransportFactory::3");
+      ROS_DEBUG_STREAM("VescTransportFactory::VescTransportFactory::3");
       for (size_t i = 0; i < transport_mappings.size(); ++i)
       {
-        ROS_INFO_STREAM("VescTransportFactory::VescTransportFactory::4");
+        ROS_DEBUG_STREAM("VescTransportFactory::VescTransportFactory::4");
 
         XmlRpc::XmlRpcValue transport_mapping = transport_mappings[i];
 
@@ -47,20 +47,20 @@ namespace vesc_differential_drive
           throw std::invalid_argument("transport mappings has not specified a port");
         std::string port = transport_mapping["port"];
 
-        ROS_INFO_STREAM("VescTransportFactory::VescTransportFactory::5");
+        ROS_DEBUG_STREAM("VescTransportFactory::VescTransportFactory::5");
 
         std::shared_ptr<vesc_driver::SerialTransport> serial_transport =
             std::make_shared<vesc_driver::SerialTransport>(controller_id);
 
-        ROS_INFO_STREAM("VescTransportFactory::VescTransportFactory::6");
+        ROS_DEBUG_STREAM("VescTransportFactory::VescTransportFactory::6");
 
         serial_transport->connect(port);
 
-        ROS_INFO_STREAM("VescTransportFactory::VescTransportFactory::7");
+        ROS_DEBUG_STREAM("VescTransportFactory::VescTransportFactory::7");
 
         transport_map_[transport_name] = serial_transport;
 
-        ROS_INFO_STREAM("VescTransportFactory::VescTransportFactory::8");
+        ROS_DEBUG_STREAM("VescTransportFactory::VescTransportFactory::8 transport_name: '" << transport_name << "'");
       }
     }
   }

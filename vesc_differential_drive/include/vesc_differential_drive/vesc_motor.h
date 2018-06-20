@@ -27,7 +27,7 @@ namespace vesc_differential_drive
 class VescMotor
 {
 public:
-  VescMotor(const ros::NodeHandle& private_nh, double execution_duration);
+  VescMotor(const ros::NodeHandle& private_nh, std::shared_ptr<VescTransportFactory> transport_factory, double execution_duration);
 
   /**
    * Gets the current motor velocity in rad/s, estimated at the given time.
@@ -53,8 +53,6 @@ public:
    * @return the supply voltage in V.
    */
   double getSupplyVoltage();
-
-  void setTransportFactory(std::shared_ptr<VescTransportFactory> transport_factory);
 
 private:
   void reconfigure(MotorConfig& config, uint32_t level);

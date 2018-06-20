@@ -111,6 +111,8 @@ namespace vesc_driver
     if (!serial_transport_ || !serial_transport_->isConnected())
       return;
 
+    ROS_DEBUG_STREAM("VescDriverSerial::execution::1.1;" << static_cast<int>(controller_id_));
+
     std::lock_guard<std::mutex> wait_for_response_lock(wait_for_response_mutex_);
 
     if (wait_for_response_)
@@ -150,12 +152,12 @@ namespace vesc_driver
 
   void VescDriverSerial::receiveFirmwareVersion(const FirmwareVersion &fw_version)
   {
-    ROS_DEBUG_STREAM("VescDriverSerial::receiveFirmwareVersion::1");
+    ROS_INFO_STREAM("VescDriverSerial::receiveFirmwareVersion::1;" << static_cast<int>(controller_id_));
     major_fw_version_ = fw_version.major_version;
     minor_fw_version_ = fw_version.minor_version;
 
     initialized_ = true;
-    ROS_DEBUG_STREAM("VescDriverSerial::receiveFirmwareVersion::2");
+    ROS_INFO_STREAM("VescDriverSerial::receiveFirmwareVersion::2;" << static_cast<int>(controller_id_));
 
     std::lock_guard<std::mutex> wait_for_response_lock(wait_for_response_mutex_);
 
