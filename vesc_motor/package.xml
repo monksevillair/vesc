@@ -1,25 +1,25 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>vesc_differential_drive</name>
+  <name>vesc_motor</name>
   <version>0.0.0</version>
-  <description>The vesc_differential_drive package</description>
+  <description>The vesc_motor package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->
   <!-- <maintainer email="jane.doe@example.com">Jane Doe</maintainer> -->
-  <maintainer email="c.muehlbacher@arti-robots.com">Clemens Mühlbacher</maintainer>
+  <maintainer email="clemens@todo.todo">clemens</maintainer>
 
 
   <!-- One license tag required, multiple allowed, one license per tag -->
   <!-- Commonly used license strings: -->
   <!--   BSD, MIT, Boost Software License, GPLv2, GPLv3, LGPLv2.1, LGPLv3 -->
-  <license>BSD</license>
+  <license>TODO</license>
 
 
   <!-- Url tags are optional, but multiple are allowed, one per tag -->
   <!-- Optional attribute type can be: website, bugtracker, or repository -->
   <!-- Example: -->
-  <!-- <url type="website">http://wiki.ros.org/vesc_differential_drive</url> -->
+  <!-- <url type="website">http://wiki.ros.org/vesc_motor</url> -->
 
 
   <!-- Author tags are optional, multiple are allowed, one per tag -->
@@ -49,35 +49,19 @@
   <!-- Use doc_depend for packages you need only for building documentation: -->
   <!--   <doc_depend>doxygen</doc_depend> -->
   <buildtool_depend>catkin</buildtool_depend>
-  <build_depend>roscpp</build_depend>
-  <build_depend>vesc_driver</build_depend>
-  <build_depend>geometry_msgs</build_depend>
-  <build_depend>nav_msgs</build_depend>
-  <build_depend>tf</build_depend>
-  <build_depend>angles</build_depend>
   <build_depend>cv_bridge</build_depend>
   <build_depend>dynamic_reconfigure</build_depend>
-  <build_depend>vesc_motor</build_depend>
-
-  <build_export_depend>roscpp</build_export_depend>
-  <build_export_depend>vesc_driver</build_export_depend>
-  <build_export_depend>geometry_msgs</build_export_depend>
-  <build_export_depend>nav_msgs</build_export_depend>
-  <build_export_depend>tf</build_export_depend>
-  <build_export_depend>angles</build_export_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>vesc_driver</build_depend>
   <build_export_depend>cv_bridge</build_export_depend>
   <build_export_depend>dynamic_reconfigure</build_export_depend>
-  <build_export_depend>vesc_motor</build_export_depend>
-
-  <exec_depend>roscpp</exec_depend>
-  <exec_depend>vesc_driver</exec_depend>
-  <exec_depend>geometry_msgs</exec_depend>
-  <exec_depend>nav_msgs</exec_depend>
-  <exec_depend>tf</exec_depend>
-  <exec_depend>angles</exec_depend>
+  <build_export_depend>roscpp</build_export_depend>
+  <build_export_depend>vesc_driver</build_export_depend>
   <exec_depend>cv_bridge</exec_depend>
   <exec_depend>dynamic_reconfigure</exec_depend>
-  <exec_depend>vesc_motor</exec_depend>
+  <exec_depend>roscpp</exec_depend>
+  <exec_depend>vesc_driver</exec_depend>
+
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

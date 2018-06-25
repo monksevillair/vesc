@@ -7,8 +7,8 @@ All rights reserved.
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef VESC_DIFFERENTIAL_DRIVE_VESC_MOTOR_H
-#define VESC_DIFFERENTIAL_DRIVE_VESC_MOTOR_H
+#ifndef vesc_motor_VESC_MOTOR_H
+#define vesc_motor_VESC_MOTOR_H
 
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
@@ -17,12 +17,12 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <ros/time.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/video/tracking.hpp>
-#include <vesc_differential_drive/MotorConfig.h>
+#include <vesc_motor/MotorConfig.h>
 #include <vesc_driver/vesc_driver_interface.h>
 #include <chrono>
-#include <vesc_differential_drive/vesc_transport_factory.h>
+#include <vesc_motor/vesc_transport_factory.h>
 
-namespace vesc_differential_drive
+namespace vesc_motor
 {
 class VescMotor
 {
@@ -80,4 +80,4 @@ private:
 };
 }
 
-#endif // VESC_DIFFERENTIAL_DRIVE_VESC_MOTOR_H
+#endif // vesc_motor_VESC_MOTOR_H

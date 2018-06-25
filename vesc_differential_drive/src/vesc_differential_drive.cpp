@@ -18,7 +18,7 @@ namespace vesc_differential_drive
 VescDifferentialDrive::VescDifferentialDrive(ros::NodeHandle private_nh, const ros::NodeHandle& left_motor_private_nh,
                                              const ros::NodeHandle& right_motor_private_nh)
   : initialized_(false), private_nh_(private_nh), reconfigure_server_(private_nh_),
-    transport_factory_(new VescTransportFactory(private_nh_)),
+    transport_factory_(new vesc_motor::VescTransportFactory(private_nh_)),
     left_motor_(left_motor_private_nh,transport_factory_, 1.0 / (config_.odometry_rate * 2.1)), left_motor_velocity_(0.),
     right_motor_(right_motor_private_nh, transport_factory_, 1.0 / (config_.odometry_rate * 2.1)), right_motor_velocity_(0.),
     linear_velocity_odom_(0.), angular_velocity_odom_(0.), x_odom_(0.), y_odom_(0.), yaw_odom_(0.)
