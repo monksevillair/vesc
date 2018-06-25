@@ -17,17 +17,17 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <ros/time.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/video/tracking.hpp>
-#include <vesc_motor/MotorConfig.h>
+#include <vesc_motor/DriveMotorConfig.h>
 #include <vesc_driver/vesc_driver_interface.h>
 #include <chrono>
 #include <vesc_motor/vesc_transport_factory.h>
 
 namespace vesc_motor
 {
-class VescMotor
+class VescDriveMotor
 {
 public:
-  VescMotor(const ros::NodeHandle& private_nh, std::shared_ptr<VescTransportFactory> transport_factory, double execution_duration);
+  VescDriveMotor(const ros::NodeHandle& private_nh, std::shared_ptr<VescTransportFactory> transport_factory, double execution_duration);
 
   /**
    * Gets the current motor velocity in rad/s, estimated at the given time.
@@ -55,7 +55,7 @@ public:
   double getSupplyVoltage();
 
 private:
-  void reconfigure(MotorConfig& config, uint32_t level);
+  void reconfigure(DriveMotorConfig& config, uint32_t level);
   void stateCB(const vesc_driver::MotorControllerState& state);
   double getVelocityConversionFactor() const;
 
@@ -63,8 +63,8 @@ private:
   void correct(double velocity);
 
   ros::NodeHandle private_nh_;
-  dynamic_reconfigure::Server<MotorConfig> reconfigure_server_;
-  MotorConfig config_;
+  dynamic_reconfigure::Server<DriveMotorConfig> reconfigure_server_;
+  DriveMotorConfig config_;
 
   std::shared_ptr<VescTransportFactory> transport_factory_;
 

@@ -90,7 +90,8 @@ find_package(OpenCV)
 
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
 generate_dynamic_reconfigure_options(
-  cfg/Motor.cfg
+    cfg/DriveMotor.cfg
+    cfg/SteeringMotor.cfg
 )
 
 ###################################
@@ -124,7 +125,8 @@ include_directories(
 ## Declare a C++ library
 add_library(${PROJECT_NAME}
   src/vesc_transport_factory.cpp include/vesc_motor/vesc_transport_factory.h
-  src/vesc_motor.cpp include/vesc_motor/vesc_motor.h
+  src/vesc_drive_motor.cpp include/vesc_motor/vesc_drive_motor.h
+  src/vesc_steering_motor.cpp include/vesc_motor/vesc_steering_motor.h
 )
 
 ## Add cmake target dependencies of the library

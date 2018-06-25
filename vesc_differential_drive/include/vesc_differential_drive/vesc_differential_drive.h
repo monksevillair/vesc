@@ -14,7 +14,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <geometry_msgs/Twist.h>
 #include <tf/transform_broadcaster.h>
 #include <vesc_differential_drive/DifferentialDriveConfig.h>
-#include <vesc_motor/vesc_motor.h>
+#include <vesc_motor/vesc_drive_motor.h>
 #include <vesc_motor/vesc_transport_factory.h>
 
 namespace vesc_differential_drive
@@ -43,10 +43,10 @@ private:
 
   std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory_;
 
-  vesc_motor::VescMotor left_motor_;
+  vesc_motor::VescDriveMotor left_motor_;
   double left_motor_velocity_;
 
-  vesc_motor::VescMotor right_motor_;
+  vesc_motor::VescDriveMotor right_motor_;
   double right_motor_velocity_;
 
   ros::Time odom_update_time_;
