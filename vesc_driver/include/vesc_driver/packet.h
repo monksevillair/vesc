@@ -15,47 +15,47 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_driver
 {
-  struct SetDutyCyclePacket
-  {
-    double duty_cycle;
-  };
+struct SetDutyCyclePacket
+{
+  double duty_cycle = 0.0;
+};
 
-  struct SetCurrentPacket
-  {
-    double current;
-  };
+struct SetCurrentPacket
+{
+  double current = 0.0;
+};
 
-  struct SetBrakePacket
-  {
-    double brake_current;
-  };
+struct SetBrakePacket
+{
+  double brake_current = 0.0;
+};
 
-  struct SetSpeedPacket
-  {
-    double speed;
-  };
+struct SetSpeedPacket
+{
+  double speed = 0.0;
+};
 
-  struct SetPositionPacket
-  {
-    double position;
-  };
+struct SetPositionPacket
+{
+  double position = 0.0;
+};
 
-  struct GetValuesPacket
-  {
-  };
+struct GetValuesPacket
+{
+};
 
-  struct GetFirmwareVersion
-  {
-  };
+struct GetFirmwareVersion
+{
+};
 
-  struct FirmwareVersion
-  {
-    uint8_t major_version;
-    uint8_t minor_version;
-  };
+struct FirmwareVersion
+{
+  uint8_t major_version = 0;
+  uint8_t minor_version = 0;
+};
 
-  typedef boost::variant<SetDutyCyclePacket, SetCurrentPacket, SetBrakePacket, SetSpeedPacket, SetPositionPacket,
-      GetValuesPacket, MotorControllerState, GetFirmwareVersion, FirmwareVersion> PacketVariant;
+typedef boost::variant<SetDutyCyclePacket, SetCurrentPacket, SetBrakePacket, SetSpeedPacket, SetPositionPacket,
+                       GetValuesPacket, MotorControllerState, GetFirmwareVersion, FirmwareVersion> PacketVariant;
 }
 
 #endif //VESC_DRIVER_PACKET_H

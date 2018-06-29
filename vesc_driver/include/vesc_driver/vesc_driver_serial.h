@@ -16,77 +16,77 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_driver
 {
-  class VescDriverSerial : public VescDriverInterface, public PeriodicExecution
+class VescDriverSerial : public VescDriverInterface, public PeriodicExecution
+{
+public:
+  VescDriverSerial(const std::chrono::duration<double>& sleep_duration,
+                   const StateHandlerFunction& state_handler_function, uint8_t controller_id, const std::string& port);
+
+  VescDriverSerial(const std::chrono::duration<double>& sleep_duration,
+                   const StateHandlerFunction& state_handler_function, uint8_t controller_id,
+                   std::shared_ptr<SerialTransport> serial_transport);
+
+  void setDutyCycle(double duty_cycle) override;
+
+  void setCurrent(double current) override;
+
+  void setBrake(double brake) override;
+
+  void setSpeed(double speed) override;
+
+  void setPosition(double position) override;
+
+  std::shared_ptr<SerialTransport> getSerialTransport();
+
+protected:
+  class PacketVariantVisitor : public boost::static_visitor<>
   {
   public:
-    VescDriverSerial(const std::chrono::duration<double> &sleep_duration,
-                     const StateHandlerFunction &state_handler_function, uint8_t controller_id, const std::string &port);
+    typedef std::function<void(const FirmwareVersion&)> ReceiveFirmwareVersionCB;
+    typedef std::function<void(const MotorControllerState&)> ReceiveMotorControllerStateCB;
 
-    VescDriverSerial(const std::chrono::duration<double> &sleep_duration,
-                     const StateHandlerFunction &state_handler_function, uint8_t controller_id,
-                     std::shared_ptr<SerialTransport> serial_transport);
+    PacketVariantVisitor(const ReceiveFirmwareVersionCB& receive_firmware_version_cb,
+                         const ReceiveMotorControllerStateCB& receive_motor_controller_state_cb);
 
-    void setDutyCycle(double duty_cycle) override;
-
-    void setCurrent(double current) override;
-
-    void setBrake(double brake) override;
-
-    void setSpeed(double speed) override;
-
-    void setPosition(double position) override;
-
-    std::shared_ptr<SerialTransport> getSerialTransport();
+    void operator()(const SetDutyCyclePacket& packet);
+    void operator()(const SetCurrentPacket& packet);
+    void operator()(const SetBrakePacket& packet);
+    void operator()(const SetSpeedPacket& packet);
+    void operator()(const SetPositionPacket& packet);
+    void operator()(const GetValuesPacket& packet);
+    void operator()(const MotorControllerState& packet);
+    void operator()(const GetFirmwareVersion& packet);
+    void operator()(const FirmwareVersion& packet);
 
   protected:
-    class PacketVariantVisitor : public boost::static_visitor<>
-    {
-    public:
-      typedef std::function<void (const FirmwareVersion& )> ReceiveFirmwareVersionCB;
-      typedef std::function<void (const MotorControllerState& )> ReceiveMotorControllerStateCB;
-
-      PacketVariantVisitor(const ReceiveFirmwareVersionCB& receive_firmware_version_cb,
-                           const ReceiveMotorControllerStateCB& receive_motor_controller_state_cb);
-
-      void operator()(const SetDutyCyclePacket& packet);
-      void operator()(const SetCurrentPacket& packet);
-      void operator()(const SetBrakePacket& packet);
-      void operator()(const SetSpeedPacket& packet);
-      void operator()(const SetPositionPacket& packet);
-      void operator()(const GetValuesPacket& packet);
-      void operator()(const MotorControllerState& packet);
-      void operator()(const GetFirmwareVersion& packet);
-      void operator()(const FirmwareVersion& packet);
-
-    protected:
-      ReceiveFirmwareVersionCB receive_firmware_version_cb_;
-      ReceiveMotorControllerStateCB receive_motor_controller_state_cb_;
-    };
-
-    void execution() override;
-
-    void processPacketVariant(const PacketVariant& packet)
-    {
-      boost::apply_visitor(packet_visitor_, packet);
-    }
-
-    void receiveFirmwareVersion(const FirmwareVersion& fw_version);
-    void receiveMotorControllerStateCB(const MotorControllerState& state);
-
-    std::shared_ptr<SerialTransport> serial_transport_;
-
-    PacketVariantVisitor packet_visitor_;
-
-    std::atomic<bool> initialized_;
-
-    std::mutex wait_for_response_mutex_;
-    bool wait_for_response_;
-
-    uint8_t major_fw_version_;
-    uint8_t minor_fw_version_;
-
-    uint8_t controller_id_;
+    ReceiveFirmwareVersionCB receive_firmware_version_cb_;
+    ReceiveMotorControllerStateCB receive_motor_controller_state_cb_;
   };
+
+  void execution() override;
+
+  void processPacketVariant(const PacketVariant& packet)
+  {
+    boost::apply_visitor(packet_visitor_, packet);
+  }
+
+  void receiveFirmwareVersion(const FirmwareVersion& fw_version);
+  void receiveMotorControllerStateCB(const MotorControllerState& state);
+
+  std::shared_ptr<SerialTransport> serial_transport_;
+
+  PacketVariantVisitor packet_visitor_;
+
+  std::atomic<bool> initialized_;
+
+  std::mutex wait_for_response_mutex_;
+  bool wait_for_response_;
+
+  uint8_t major_fw_version_;
+  uint8_t minor_fw_version_;
+
+  uint8_t controller_id_;
+};
 }
 
 #endif //VESC_DRIVER_VESC_DRIVER_SERIAL_H

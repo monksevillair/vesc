@@ -11,31 +11,30 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_driver
 {
-  PeriodicExecution::PeriodicExecution(const std::chrono::duration<double> &execution_duration) :
-      execution_duration_(std::chrono::duration_cast<Clock::duration>(execution_duration)), run_(true),
-      execution_thread_(&PeriodicExecution::executionLoop, this)
-  { }
+PeriodicExecution::PeriodicExecution(const std::chrono::duration<double>& execution_duration)
+  : execution_duration_(std::chrono::duration_cast<Clock::duration>(execution_duration)),
+    execution_thread_(&PeriodicExecution::executionLoop, this)
+{}
 
-  void PeriodicExecution::stop()
+void PeriodicExecution::stop()
+{
+  std::lock_guard<std::mutex> run_lock(run_mutex_);
+  run_ = false;
+}
+
+bool PeriodicExecution::isRunning()
+{
+  std::unique_lock<std::mutex> run_lock(run_mutex_);
+  return run_;
+}
+
+void PeriodicExecution::executionLoop()
+{
+  while (isRunning())
   {
-    std::lock_guard<std::mutex> run_lock(run_mutex_);
-    run_ = false;
+    const Clock::time_point end_of_period = Clock::now() + execution_duration_;
+    execution();
+    std::this_thread::sleep_until(end_of_period);
   }
-
-  void PeriodicExecution::executionLoop()
-  {
-    std::unique_lock<std::mutex> run_lock(run_mutex_);
-    while (run_)
-    {
-      run_lock.unlock();
-
-      Clock::time_point sleep_till = Clock::now() + execution_duration_;
-
-      execution();
-
-      std::this_thread::sleep_until(sleep_till);
-
-      run_lock.lock();
-    }
-  }
+}
 }

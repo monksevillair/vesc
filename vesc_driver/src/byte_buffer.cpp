@@ -8,227 +8,181 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
  */
 
 #include <vesc_driver/byte_buffer.h>
+#include <limits>
+#include <ros/console.h>
 #include <utility>
-#include <ros/ros.h>
 
 namespace vesc_driver
 {
-  ByteBuffer::ByteBuffer() : parsing_index_(0)
-  { }
+ByteBuffer::ByteBuffer(std::vector<uint8_t>&& input_bytes)
+  : buffer_(std::forward(input_bytes))
+{}
 
-  ByteBuffer::ByteBuffer(std::vector<uint8_t> &&input_bytes) :
-      buffer_(std::forward<std::vector<uint8_t>>(input_bytes)), parsing_index_(0)
-  { }
+void ByteBuffer::addBytes(const std::vector<uint8_t>& input_bytes)
+{
+  buffer_.insert(buffer_.end(), input_bytes.begin(), input_bytes.end());
 
-  void ByteBuffer::addBytes(const std::vector<uint8_t> &input_bytes)
+  ROS_DEBUG_STREAM("ByteBuffer::addBytes::1");
+  for (const auto byte : input_bytes)
   {
-    buffer_.insert(buffer_.end(), input_bytes.begin(), input_bytes.end());
-
-    ROS_DEBUG_STREAM("ByteBuffer::addBytes::1");
-    for (auto byte : input_bytes)
-          ROS_DEBUG_STREAM("ByteBuffer::addBytes::1.1 input_bytes: " << static_cast<int>(byte));    
+    ROS_DEBUG_STREAM("ByteBuffer::addBytes::1.1 input_bytes: " << static_cast<int>(byte));
   }
+}
 
-  size_t ByteBuffer::getSize() const
-  {
-    return buffer_.size();
-  }
+size_t ByteBuffer::getSize() const
+{
+  return buffer_.size();
+}
 
-  void ByteBuffer::clear()
-  {
-    buffer_.clear();
-    parsing_index_ = 0;
-  }
+void ByteBuffer::clear()
+{
+  buffer_.clear();
+  parsing_index_ = 0;
+}
 
-  uint8_t ByteBuffer::parsUnsignedInt8()
-  {
-    uint8_t result = 0;
-    size_t new_parsing_index;
+uint8_t ByteBuffer::parseUnsignedInt8()
+{
+  return buffer_.at(parsing_index_++);
+}
 
-    ROS_DEBUG_STREAM("ByteBuffer::parsUnsignedInt8::1 parsing_index_: " << parsing_index_);
+uint16_t ByteBuffer::parseUnsignedInt16()
+{
+  const uint16_t result
+    = (static_cast<uint16_t>(buffer_.at(parsing_index_ + 0)) << 8) +
+      (static_cast<uint16_t>(buffer_.at(parsing_index_ + 1)) << 0);
+  parsing_index_ += 2;
+  return result;
+}
 
-    if ((buffer_.size() - 1) < parsing_index_)
-    {
-      new_parsing_index = buffer_.size();
-    }
-    else
-    {
-      new_parsing_index = parsing_index_ + 1;
-      result = buffer_[parsing_index_];
-    }
+uint32_t ByteBuffer::parseUnsignedInt32()
+{
+  const uint32_t result
+    = (static_cast<uint32_t>(buffer_.at(parsing_index_ + 0)) << 24) +
+      (static_cast<uint32_t>(buffer_.at(parsing_index_ + 1)) << 16) +
+      (static_cast<uint32_t>(buffer_.at(parsing_index_ + 2)) << 8) +
+      (static_cast<uint32_t>(buffer_.at(parsing_index_ + 3)) << 0);
+  parsing_index_ += 4;
+  return result;
+}
 
-    parsing_index_= new_parsing_index;
+int8_t ByteBuffer::parseInt8()
+{
+  return static_cast<int8_t>(parseUnsignedInt8());
+}
 
-    ROS_DEBUG_STREAM("ByteBuffer::parsUnsignedInt8::2 parsing_index_: " << parsing_index_);
+int16_t ByteBuffer::parseInt16()
+{
+  return static_cast<int16_t>(parseUnsignedInt16());
+}
 
-    return result;
-  }
+int32_t ByteBuffer::parseInt32()
+{
+  return static_cast<int32_t>(parseUnsignedInt32());
+}
 
-  uint16_t ByteBuffer::parsUnsignedInt16()
-  {
-    uint16_t result = 0;
-    size_t new_parsing_index;
+float ByteBuffer::parseFloat16()
+{
+  return static_cast<float>(parseInt16());
+}
 
-    if ((buffer_.size() - 1) < (parsing_index_ + 1))
-    {
-      new_parsing_index = buffer_.size();
-    }
-    else
-    {
-      new_parsing_index = parsing_index_ + 2;
-      result = (static_cast<uint16_t>(buffer_[parsing_index_]) << 8) +
-               static_cast<uint16_t>(buffer_[parsing_index_ + 1]);
-    }
+float ByteBuffer::parseFloat32()
+{
+  return static_cast<float>(parseInt32());
+}
 
-    parsing_index_= new_parsing_index;
+void ByteBuffer::resetParsing()
+{
+  parsing_index_ = 0;
+}
 
-    return result;
-  }
+bool ByteBuffer::canParseFurther() const
+{
+  ROS_DEBUG_STREAM(
+    "ByteBuffer::canParseFurther::1 parsing_index_: " << parsing_index_ << " buffer_.size(): " << buffer_.size());
 
-  uint32_t ByteBuffer::parsUnsignedInt32()
-  {
-    uint32_t result = 0;
-    size_t new_parsing_index;
+  return parsing_index_ < buffer_.size();
+}
 
-    if ((buffer_.size() - 1) < (parsing_index_ + 3))
-    {
-      new_parsing_index = buffer_.size();
-    }
-    else
-    {
-      new_parsing_index = parsing_index_ + 4;
-      result = (static_cast<uint32_t>(buffer_[parsing_index_]) << 24) +
-               (static_cast<uint32_t>(buffer_[parsing_index_ + 1]) << 16) +
-               (static_cast<uint32_t>(buffer_[parsing_index_ + 2]) << 8) +
-               static_cast<uint32_t>(buffer_[parsing_index_ + 3]);
-    }
+void ByteBuffer::advanceTo(size_t index)
+{
+  parsing_index_ = index;
+}
 
-    parsing_index_= new_parsing_index;
+void ByteBuffer::reverseAdvanceTo(size_t index)
+{
+  parsing_index_ = buffer_.size() - std::min(index + 1, buffer_.size());
+}
 
-    return result;
-  }
+void ByteBuffer::advanceBy(size_t index)
+{
+  parsing_index_ += index;
+}
 
-  int8_t ByteBuffer::parsInt8()
-  {
-    return static_cast<int8_t>(parsUnsignedInt8());
-  }
+void ByteBuffer::retreatBy(size_t index)
+{
+  parsing_index_ -= std::min(index, parsing_index_);
+}
 
-  int16_t ByteBuffer::parsInt16()
-  {
-    return static_cast<int16_t>(parsUnsignedInt16());
-  }
+void ByteBuffer::reduceToParsingPoint()
+{
+  buffer_.erase(buffer_.begin(), buffer_.begin() + parsing_index_);
+  parsing_index_ = 0;
+}
 
-  int32_t ByteBuffer::parsInt32()
-  {
-    return static_cast<int32_t>(parsUnsignedInt32());
-  }
+ByteBuffer::operator std::vector<uint8_t>() const
+{
+  return buffer_;
+}
 
-  float ByteBuffer::parsFloat16()
-  {
-    return static_cast<float>(parsInt16());
-  }
+void ByteBuffer::addUnsignedInt8(uint8_t value)
+{
+  buffer_.push_back(value);
+}
 
-  float ByteBuffer::parsFloat32()
-  {
-    return static_cast<float>(parsInt32());
-  }
+void ByteBuffer::addUnsignedInt16(uint16_t value)
+{
+  buffer_.push_back(static_cast<uint8_t>(value >> 8));
+  buffer_.push_back(static_cast<uint8_t>(value >> 0));
+}
 
-  void ByteBuffer::resetParsing()
-  {
-    parsing_index_ = 0;
-  }
+void ByteBuffer::addUnsignedInt32(uint32_t value)
+{
+  buffer_.push_back(static_cast<uint8_t>(value >> 24));
+  buffer_.push_back(static_cast<uint8_t>(value >> 16));
+  buffer_.push_back(static_cast<uint8_t>(value >> 8));
+  buffer_.push_back(static_cast<uint8_t>(value >> 0));
+}
 
-  bool ByteBuffer::canFurtherPars()
-  {
-    ROS_DEBUG_STREAM("ByteBuffer::canFurtherPars::1 parsing_index_: " << parsing_index_ << " buffer_.size(): " << buffer_.size());
+void ByteBuffer::addInt8(int8_t value)
+{
+  addUnsignedInt8(static_cast<uint8_t>(value));
+}
 
-    return parsing_index_ < buffer_.size();
-  }
+void ByteBuffer::addInt16(int16_t value)
+{
+  addUnsignedInt16(static_cast<uint16_t>(value));
+}
 
-  void ByteBuffer::advanceTo(size_t index)
-  {
-    parsing_index_ = index;
-  }
+void ByteBuffer::addInt32(int32_t value)
+{
+  addUnsignedInt32(static_cast<uint32_t>(value));
+}
 
-  void ByteBuffer::reverseAdvanceTo(size_t index)
-  {
-    if (buffer_.empty() || ((buffer_.size() - 1) < index))
-    {
-      parsing_index_ = 0;
-      return;
-    }
-
-    parsing_index_ = buffer_.size() - 1 - index;
-  }
-
-  void ByteBuffer::step(size_t index)
-  {
-    parsing_index_+= index;
-  }
-
-  void ByteBuffer::reverseStep(size_t index)
-  {
-    if (parsing_index_ < index)
-    {
-      parsing_index_ = 0;
-      return;
-    }
-
-    parsing_index_-=index;
-  }
-
-  void ByteBuffer::reduceToParsingPoint()
-  {
-    buffer_.erase(buffer_.begin(), buffer_.begin() + parsing_index_);
-    parsing_index_ = 0;
-  }
-
-  ByteBuffer::operator std::vector<uint8_t>() const
-  {
-    return buffer_;
-  }
-
-  void ByteBuffer::addUnsigedInt8(uint8_t value)
-  {
-    buffer_.push_back(value);
-  }
-
-  void ByteBuffer::addUnsigedInt16(uint16_t value)
-  {
-    buffer_.push_back(static_cast<uint8_t>((value >> 8) & 0xFF));
-    buffer_.push_back(static_cast<uint8_t>(value & 0xFF));
-  }
-
-  void ByteBuffer::addUnsigedInt32(uint32_t value)
-  {
-    buffer_.push_back(static_cast<uint8_t>((value >> 24) & 0xFF));
-    buffer_.push_back(static_cast<uint8_t>((value >> 16) & 0xFF));
-    buffer_.push_back(static_cast<uint8_t>((value >> 8) & 0xFF));
-    buffer_.push_back(static_cast<uint8_t>(value & 0xFF));
-  }
-
-  void ByteBuffer::addInt8(int8_t value)
-  {
-    addUnsigedInt8(static_cast<uint8_t>(value));
-  }
-
-  void ByteBuffer::addInt16(int16_t value)
-  {
-    addUnsigedInt16(static_cast<uint16_t>(value));
-  }
-
-  void ByteBuffer::addInt32(int32_t value)
-  {
-    addUnsigedInt32(static_cast<uint32_t>(value));
-  }
-
-  void ByteBuffer::addFloat16(float value)
+void ByteBuffer::addFloat16(double value)
+{
+  if (std::numeric_limits<int16_t>::min() <= value && value <= std::numeric_limits<int16_t>::max())
   {
     addInt16(static_cast<int16_t>(value));
   }
+  throw std::out_of_range("value is outside range for float16");
+}
 
-  void ByteBuffer::addFloat32(float value)
+void ByteBuffer::addFloat32(double value)
+{
+  if (std::numeric_limits<int32_t>::min() <= value && value <= std::numeric_limits<int32_t>::max())
   {
-    addInt32(static_cast<int32_t>(value));
+  addInt32(static_cast<int32_t>(value));
   }
+  throw std::out_of_range("value is outside range for float32");
+}
 }

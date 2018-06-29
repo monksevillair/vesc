@@ -14,15 +14,15 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_driver
 {
-  class Transport
-  {
-  public:
-    typedef std::function<void(const PacketVariant&)> PacketHandler;
+class Transport
+{
+public:
+  typedef std::function<void(const PacketVariant&)> PacketHandler;
 
-    virtual void submit(TransportRequest&& r) = 0;
+  virtual void submit(TransportRequest&& r) = 0;
 
-    virtual void registerPacketHandler(uint8_t controller_id, PacketHandler &&pacekt_handler) = 0;
-  };
+  virtual void registerPacketHandler(uint8_t controller_id, PacketHandler&& packet_handler) = 0;
+};
 }
 
 #endif //VESC_DRIVER_TRANSPORT_H

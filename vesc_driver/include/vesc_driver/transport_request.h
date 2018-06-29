@@ -15,22 +15,22 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_driver
 {
-  class TransportRequest
-  {
-  public:
-    TransportRequest(uint8_t controller_id, PacketVariant&& packet, bool expect_response=false);
+class TransportRequest
+{
+public:
+  TransportRequest(uint8_t controller_id, PacketVariant&& packet, bool expect_response = false);
 
-    uint8_t getControllerId();
+  uint8_t getControllerId() const;
 
-    PacketVariant getPacket();
+  const PacketVariant& getPacket() const;
 
-    bool expectResponse();
+  bool expectResponse() const;
 
-  protected:
-    uint8_t controller_id_;
-    PacketVariant packet_;
-    bool expect_response_;
-  };
+protected:
+  uint8_t controller_id_;
+  PacketVariant packet_;
+  bool expect_response_;
+};
 }
 
 #endif //VESC_DRIVER_TRANSPORT_REQUEST_H

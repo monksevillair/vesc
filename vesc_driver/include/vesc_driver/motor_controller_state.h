@@ -14,26 +14,25 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_driver
 {
-  struct MotorControllerState
+struct MotorControllerState
+{
+  enum class FaultCode
   {
-    MotorControllerState() :
-        fault_code(FAULT_CODE::NO_FAULT), voltage_input(0.), current_motor(0.), current_input(0.), speed(0.),
-        position(0.), duty_cycle(0.), charge_drawn(0.), displacement(0), distance_traveled(0), charge_regen(0.)
-    { }
-    enum FAULT_CODE {NO_FAULT = 0, OVER_VOLTAGE, UNDER_VOLTAGE, DRV8302, ABS_OVER_CURRENT, OVER_TEMP_FET, OVER_TEMP_MOTOR};
-
-    FAULT_CODE fault_code;
-    double voltage_input;        // input voltage in (V)
-    double current_motor;        // motor current (A)
-    double current_input;        // input current (A)
-    double speed;                // motor electrical speed (RRPM) real speed needs to consider the number of pools for the motor
-    double position;             // motor position (rad)
-    double duty_cycle;           // duty cycle [0, 1]
-    double charge_drawn;         // electric charge drawn (Ah)
-    double charge_regen;         // electrical charge regained (Ah)
-    uint64_t displacement;       // net tachometer (counts)
-    uint64_t distance_traveled;  // total tachometer (counts
+    NO_FAULT = 0, OVER_VOLTAGE, UNDER_VOLTAGE, DRV8302, ABS_OVER_CURRENT, OVER_TEMP_FET, OVER_TEMP_MOTOR
   };
+
+  FaultCode fault_code = FaultCode::NO_FAULT;
+  double voltage_input = 0.0;        // input voltage in (V)
+  double current_motor = 0.0;        // motor current (A)
+  double current_input = 0.0;        // input current (A)
+  double speed = 0.0;                // motor electrical speed (RRPM) real speed needs to consider the number of pools for the motor
+  double position = 0.0;             // motor position (rad)
+  double duty_cycle = 0.0;           // duty cycle [0, 1]
+  double charge_drawn = 0.0;         // electric charge drawn (Ah)
+  double charge_regen = 0.0;         // electrical charge regained (Ah)
+  int32_t displacement = 0;         // net tachometer (counts)
+  int32_t distance_traveled = 0;    // total tachometer (counts)
+};
 }
 
 #endif //VESC_DRIVER_MOTOR_CONTROLLER_STATE_H

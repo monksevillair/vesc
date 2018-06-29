@@ -10,93 +10,97 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #ifndef VESC_DRIVER_BLOCKING_QUEUE_H
 #define VESC_DRIVER_BLOCKING_QUEUE_H
 
-#include <mutex>
 #include <condition_variable>
+#include <exception>
+#include <mutex>
 #include <queue>
 
 namespace vesc_driver
 {
-  class InterruptException : public std::exception
-  { };
+class InterruptException : public std::exception
+{
+};
 
-  template<class E>
-  class BlockingQueue
+template<class E>
+class BlockingQueue
+{
+public:
+  void push(E&& element)
   {
-  public:
-    BlockingQueue() : interrupt_(false)
-    { }
+    std::lock_guard<std::mutex> queue_lock(queue_mutex_);
 
-    void push(E &&element)
+    queue_.push(std::forward(element));
+
+    queue_condition_variable_.notify_all();
+  }
+
+  E pop() throw(InterruptException)
+  {
+    std::unique_lock<std::mutex> queue_lock(queue_mutex_);
+
+    while (queue_.empty())
     {
-      std::lock_guard<std::mutex> queue_lock(queue_mutex_);
-
-      queue_.push(std::forward<E>(element));
-
-      queue_condition_variable_.notify_all();
+      queue_condition_variable_.wait(queue_lock);
     }
 
-    E pop() throw(InterruptException)
+    if (interrupt_)
     {
-      std::unique_lock<std::mutex> queue_lock(queue_mutex_);
-
-      while(queue_.empty())
-        queue_condition_variable_.wait(queue_lock);
-
-      if (interrupt_)
-        throw InterruptException();
-
-      E element = queue_.front();
-      queue_.pop();
-
-      return element;
+      throw InterruptException();
     }
 
-    E peek() throw(InterruptException)
+    E element = queue_.front();
+    queue_.pop();
+
+    return element;
+  }
+
+  E peek() throw(InterruptException)
+  {
+    std::unique_lock<std::mutex> queue_lock(queue_mutex_);
+
+    while (queue_.empty())
     {
-      std::unique_lock<std::mutex> queue_lock(queue_mutex_);
-
-      while(queue_.empty())
-        queue_condition_variable_.wait(queue_lock);
-
-      if (interrupt_)
-        throw InterruptException();
-
-      E element = queue_.front();
-
-      return element;
+      queue_condition_variable_.wait(queue_lock);
     }
 
-    bool empty()
+    if (interrupt_)
     {
-      std::lock_guard<std::mutex> queue_lock(queue_mutex_);
-
-      return queue_.empty();
+      throw InterruptException();
     }
 
-    void interrupt()
-    {
-      std::lock_guard<std::mutex> queue_lock(queue_mutex_);
+    return queue_.front();
+  }
 
-      interrupt_ = true;
+  bool empty()
+  {
+    std::lock_guard<std::mutex> queue_lock(queue_mutex_);
+    return queue_.empty();
+  }
 
-      queue_condition_variable_.notify_all();
-    }
+  void interrupt()
+  {
+    std::lock_guard<std::mutex> queue_lock(queue_mutex_);
 
-    void resetInterrupt()
-    {
-      std::lock_guard<std::mutex> queue_lock(queue_mutex_);
+    interrupt_ = true;
 
-      interrupt_ = false;
-    }
+    queue_condition_variable_.notify_all();
+  }
 
-  private:
-    std::mutex queue_mutex_;
-    std::condition_variable queue_condition_variable_;
+  void resetInterrupt()
+  {
+    std::lock_guard<std::mutex> queue_lock(queue_mutex_);
 
-    std::queue<E> queue_;
+    interrupt_ = false;
+  }
 
-    bool interrupt_;
-  };
+private:
+  std::mutex queue_mutex_;
+  std::condition_variable queue_condition_variable_;
+
+  std::queue<E> queue_;
+
+  bool interrupt_ = false;
+};
 }
 
 #endif //VESC_DRIVER_BLOCKING_QUEUE_H

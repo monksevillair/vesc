@@ -10,33 +10,34 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #ifndef VESC_DRIVER_PERIODIC_EXECUTION_H
 #define VESC_DRIVER_PERIODIC_EXECUTION_H
 
+#include <chrono>
 #include <mutex>
 #include <thread>
-#include <chrono>
 
 namespace vesc_driver
 {
-  class PeriodicExecution
-  {
-  public:
-    typedef std::chrono::system_clock Clock;
+class PeriodicExecution
+{
+public:
+  explicit PeriodicExecution(const std::chrono::duration<double>& execution_duration);
 
-    explicit PeriodicExecution(const std::chrono::duration<double> &execution_duration);
+  void stop();
 
-    void stop();
+protected:
+  virtual void execution() = 0;
 
-  protected:
-    virtual void execution() = 0;
+private:
+  typedef std::chrono::system_clock Clock;
 
-  private:
-    void executionLoop();
+  bool isRunning();
+  void executionLoop();
 
-    std::mutex run_mutex_;
-    bool run_;
+  std::mutex run_mutex_;
+  bool run_ = true;
 
-    std::thread execution_thread_;
-    Clock::duration execution_duration_;
-  };
+  Clock::duration execution_duration_;
+  std::thread execution_thread_;
+};
 }
 
 #endif //VESC_DRIVER_PERIODIC_EXECUTION_H

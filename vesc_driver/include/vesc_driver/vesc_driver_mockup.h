@@ -16,29 +16,29 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_driver
 {
-  class VescDriverMockup : public VescDriverInterface, public PeriodicExecution
-  {
-  public:
-    VescDriverMockup(const std::chrono::duration<double> &sleep_duration,
-                     const StateHandlerFunction &state_handler_function);
+class VescDriverMockup : public VescDriverInterface, public PeriodicExecution
+{
+public:
+  VescDriverMockup(const std::chrono::duration<double>& sleep_duration,
+                   const StateHandlerFunction& state_handler_function);
 
-    void setDutyCycle(double duty_cycle) override;
+  void setDutyCycle(double duty_cycle) override;
 
-    void setCurrent(double current) override;
+  void setCurrent(double current) override;
 
-    void setBrake(double brake) override;
+  void setBrake(double brake) override;
 
-    void setSpeed(double speed) override;
+  void setSpeed(double speed) override;
 
-    void setPosition(double position) override;
+  void setPosition(double position) override;
 
-  protected:
-    void execution() override;
+protected:
+  void execution() override;
 
-  private:
-    std::mutex current_state_mutex_;
-    MotorControllerState current_state_;
-  };
+private:
+  std::mutex current_state_mutex_;
+  MotorControllerState current_state_;
+};
 }
 
 #endif //VESC_DRIVER_VESC_DRIVER_MOCKUP_H

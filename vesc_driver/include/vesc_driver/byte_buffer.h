@@ -10,64 +10,68 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #ifndef VESC_DRIVER_BYTE_BUFFER_H
 #define VESC_DRIVER_BYTE_BUFFER_H
 
-#include <vector>
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
+#include <vector>
 
 namespace vesc_driver
 {
-  class ByteBuffer
-  {
-  public:
-    ByteBuffer();
+/**
+ * Represents a buffer of bytes. Has helper methods to read and write numbers of various types. The parsing methods
+ * throw std::out_of_range if the buffer contains less bytes than would be necessary to read the number.
+ */
+class ByteBuffer
+{
+public:
+  ByteBuffer() = default;
 
-    explicit ByteBuffer(std::vector<uint8_t> &&input_bytes);
+  explicit ByteBuffer(std::vector<uint8_t>&& input_bytes);
 
-    void addBytes(const std::vector<uint8_t> &input_bytes);
+  void addBytes(const std::vector<uint8_t>& input_bytes);
 
-    size_t getSize() const;
+  size_t getSize() const;
 
-    void clear();
+  void clear();
 
-    uint8_t parsUnsignedInt8();
-    uint16_t parsUnsignedInt16();
-    uint32_t parsUnsignedInt32();
+  uint8_t parseUnsignedInt8();
+  uint16_t parseUnsignedInt16();
+  uint32_t parseUnsignedInt32();
 
-    int8_t parsInt8();
-    int16_t parsInt16();
-    int32_t parsInt32();
+  int8_t parseInt8();
+  int16_t parseInt16();
+  int32_t parseInt32();
 
-    float parsFloat16();
-    float parsFloat32();
+  float parseFloat16();
+  float parseFloat32();
 
-    void addUnsigedInt8(uint8_t value);
-    void addUnsigedInt16(uint16_t value);
-    void addUnsigedInt32(uint32_t value);
+  void addUnsignedInt8(uint8_t value);
+  void addUnsignedInt16(uint16_t value);
+  void addUnsignedInt32(uint32_t value);
 
-    void addInt8(int8_t value);
-    void addInt16(int16_t value);
-    void addInt32(int32_t value);
+  void addInt8(int8_t value);
+  void addInt16(int16_t value);
+  void addInt32(int32_t value);
 
-    void addFloat16(float value);
-    void addFloat32(float value);
+  void addFloat16(double value);
+  void addFloat32(double value);
 
-    void resetParsing();
-    bool canFurtherPars();
+  void resetParsing();
+  bool canParseFurther() const;
 
-    void advanceTo(size_t index);
-    void reverseAdvanceTo(size_t index);
+  void advanceTo(size_t index);
+  void reverseAdvanceTo(size_t index);
 
-    void step(size_t index);
-    void reverseStep(size_t index);
+  void advanceBy(size_t index);
+  void retreatBy(size_t index);
 
-    void reduceToParsingPoint();
+  void reduceToParsingPoint();
 
-    operator std::vector<uint8_t>() const;
+  explicit operator std::vector<uint8_t>() const;
 
-  private:
-    std::vector<uint8_t> buffer_;
-    size_t parsing_index_;
-  };
+private:
+  std::vector<uint8_t> buffer_;
+  size_t parsing_index_ = 0;
+};
 }
 
 #endif //VESC_DRIVER_BYTE_BUFFER_H
