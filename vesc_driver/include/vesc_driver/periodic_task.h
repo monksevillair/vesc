@@ -7,40 +7,40 @@ All rights reserved.
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef VESC_DRIVER_VESC_DRIVER_MOCKUP_H
-#define VESC_DRIVER_VESC_DRIVER_MOCKUP_H
+#ifndef VESC_DRIVER_PERIODIC_TASK_H
+#define VESC_DRIVER_PERIODIC_TASK_H
 
-#include <vesc_driver/vesc_driver_interface.h>
-#include <vesc_driver/periodic_task.h>
+#include <chrono>
+#include <condition_variable>
 #include <mutex>
+#include <thread>
 
 namespace vesc_driver
 {
-class VescDriverMockup : public VescDriverInterface, public PeriodicTask
+class PeriodicTask
 {
 public:
-  VescDriverMockup(const std::chrono::duration<double>& sleep_duration,
-                   const StateHandlerFunction& state_handler_function);
+  explicit PeriodicTask(const std::chrono::duration<double>& period);
+  virtual ~PeriodicTask();
 
-  void setDutyCycle(double duty_cycle) override;
-
-  void setCurrent(double current) override;
-
-  void setBrake(double brake) override;
-
-  void setSpeed(double speed) override;
-
-  void setPosition(double position) override;
-
-  FirmwareVersion getFirmwareVersion() override;
+  virtual void stop();
 
 protected:
-  void execute() override;
+  virtual void execute() = 0;
 
 private:
-  std::mutex current_state_mutex_;
-  MotorControllerState current_state_;
+  typedef std::chrono::system_clock Clock;
+
+  bool isRunning(const Clock::time_point& end_of_period);
+  void executionLoop();
+
+  std::mutex run_mutex_;
+  std::condition_variable run_condition_;
+  bool running_ = true;
+
+  Clock::duration period_;
+  std::thread execution_thread_;
 };
 }
 
-#endif //VESC_DRIVER_VESC_DRIVER_MOCKUP_H
+#endif //VESC_DRIVER_PERIODIC_TASK_H

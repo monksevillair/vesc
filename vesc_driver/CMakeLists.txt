@@ -17,6 +17,7 @@ catkin_package(
 ###########
 ## Build ##
 ###########
+
 add_compile_options(-std=c++11)
 
 include_directories(
@@ -26,9 +27,20 @@ include_directories(
 )
 
 add_library(${PROJECT_NAME}
-        include/vesc_driver/motor_controller_state.h
-        include/vesc_driver/vesc_driver_interface.h
-        src/vesc_driver_mockup.cpp include/vesc_driver/vesc_driver_mockup.h src/periodic_execution.cpp include/vesc_driver/periodic_execution.h include/vesc_driver/packet.h src/transport_request.cpp include/vesc_driver/transport_request.h include/vesc_driver/transport.h src/serial_transport.cpp include/vesc_driver/serial_transport.h src/serial_packet_codec.cpp include/vesc_driver/serial_packet_codec.h src/byte_buffer.cpp include/vesc_driver/byte_buffer.h include/vesc_driver/blocking_queue.h src/vesc_driver_serial.cpp include/vesc_driver/vesc_driver_serial.h)
+  include/vesc_driver/blocking_queue.h
+  include/vesc_driver/motor_controller_state.h
+  include/vesc_driver/packet.h
+  include/vesc_driver/periodic_task.h src/periodic_task.cpp
+  include/vesc_driver/serial_data_reader.h src/serial_data_reader.cpp
+  include/vesc_driver/serial_data_writer.h src/serial_data_writer.cpp
+  include/vesc_driver/serial_packet_codec.h src/serial_packet_codec.cpp
+  include/vesc_driver/serial_transport.h src/serial_transport.cpp
+  include/vesc_driver/transport.h
+  include/vesc_driver/transport_request.h src/transport_request.cpp
+  include/vesc_driver/vesc_driver_impl.h src/vesc_driver_impl.cpp
+  include/vesc_driver/vesc_driver_interface.h src/vesc_driver_interface.cpp
+  include/vesc_driver/vesc_driver_mockup.h src/vesc_driver_mockup.cpp
+)
 
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
@@ -37,12 +49,13 @@ target_link_libraries(${PROJECT_NAME}
 add_dependencies(${PROJECT_NAME}
   ${catkin_EXPORTED_TARGETS}
 )
+
 #############
 ## Install ##
 #############
 
 install(DIRECTORY include/${PROJECT_NAME}/
-        DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
 
 #############
 ## Testing ##

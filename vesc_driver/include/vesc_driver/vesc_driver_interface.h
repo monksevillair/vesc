@@ -10,8 +10,9 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #ifndef VESC_DRIVER_VESC_DRIVER_INTERFACE_H
 #define VESC_DRIVER_VESC_DRIVER_INTERFACE_H
 
-#include <vesc_driver/motor_controller_state.h>
 #include <functional>
+#include <vesc_driver/motor_controller_state.h>
+#include <vesc_driver/packet.h>
 
 namespace vesc_driver
 {
@@ -20,9 +21,8 @@ class VescDriverInterface
 public:
   typedef std::function<void(const MotorControllerState&)> StateHandlerFunction;
 
-  explicit VescDriverInterface(const StateHandlerFunction& state_handler_function)
-    : state_handler_function_(state_handler_function)
-  {}
+  explicit VescDriverInterface(const StateHandlerFunction& state_handler_function);
+  virtual ~VescDriverInterface() = default;
 
   /**
    * @param duty_cycle Commanded VESC duty cycle. Valid range for this driver is -1 to +1. However,
@@ -58,6 +58,8 @@ public:
    *                 Note that the VESC must be in encoder mode for this command to have an effect.
    */
   virtual void setPosition(double position) = 0;
+
+  virtual FirmwareVersion getFirmwareVersion() = 0;
 
 protected:
   StateHandlerFunction state_handler_function_;

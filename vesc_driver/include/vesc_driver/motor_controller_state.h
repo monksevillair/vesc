@@ -22,16 +22,16 @@ struct MotorControllerState
   };
 
   FaultCode fault_code = FaultCode::NO_FAULT;
-  double voltage_input = 0.0;        // input voltage in (V)
-  double current_motor = 0.0;        // motor current (A)
-  double current_input = 0.0;        // input current (A)
-  double speed = 0.0;                // motor electrical speed (RRPM) real speed needs to consider the number of pools for the motor
-  double position = 0.0;             // motor position (rad)
-  double duty_cycle = 0.0;           // duty cycle [0, 1]
-  double charge_drawn = 0.0;         // electric charge drawn (Ah)
-  double charge_regen = 0.0;         // electrical charge regained (Ah)
-  int32_t displacement = 0;         // net tachometer (counts)
-  int32_t distance_traveled = 0;    // total tachometer (counts)
+  double voltage_input = 0.0;     // input voltage (V)
+  double current_motor = 0.0;     // motor current (A)
+  double current_input = 0.0;     // input current (A)
+  double speed = 0.0;             // electrical speed (ERPM); real speed needs to consider the number of poles
+  double position = 0.0;          // position (rad)
+  double duty_cycle = 0.0;        // duty cycle in [0, 1]
+  double charge_drawn = 0.0;      // electric charge drawn (Ah)
+  double charge_regen = 0.0;      // electrical charge regenerated (Ah)
+  int32_t displacement = 0;       // net tachometer (counts)
+  int32_t distance_traveled = 0;  // total tachometer (counts)
 };
 }
 

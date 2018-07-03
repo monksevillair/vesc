@@ -7,34 +7,46 @@ All rights reserved.
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <vesc_driver/periodic_execution.h>
+#include <vesc_driver/periodic_task.h>
 
 namespace vesc_driver
 {
-PeriodicExecution::PeriodicExecution(const std::chrono::duration<double>& execution_duration)
-  : execution_duration_(std::chrono::duration_cast<Clock::duration>(execution_duration)),
-    execution_thread_(&PeriodicExecution::executionLoop, this)
+PeriodicTask::PeriodicTask(const std::chrono::duration<double>& period)
+  : period_(std::chrono::duration_cast<Clock::duration>(period)),
+    execution_thread_(&PeriodicTask::executionLoop, this)
 {}
 
-void PeriodicExecution::stop()
+PeriodicTask::~PeriodicTask()
 {
-  std::lock_guard<std::mutex> run_lock(run_mutex_);
-  run_ = false;
+  stop();
 }
 
-bool PeriodicExecution::isRunning()
+void PeriodicTask::stop()
 {
-  std::unique_lock<std::mutex> run_lock(run_mutex_);
-  return run_;
-}
-
-void PeriodicExecution::executionLoop()
-{
-  while (isRunning())
+  if (execution_thread_.joinable())
   {
-    const Clock::time_point end_of_period = Clock::now() + execution_duration_;
-    execution();
-    std::this_thread::sleep_until(end_of_period);
+    std::lock_guard<std::mutex> run_lock(run_mutex_);
+    running_ = false;
+    run_condition_.notify_all();
+    execution_thread_.join();
+  }
+}
+
+bool PeriodicTask::isRunning(const Clock::time_point& end_of_period)
+{
+  // Wait until stopped or timeout:
+  std::unique_lock<std::mutex> run_lock(run_mutex_);
+  while (running_ && run_condition_.wait_until(run_lock, end_of_period) != std::cv_status::timeout)
+  {
+  }
+  return running_;
+}
+
+void PeriodicTask::executionLoop()
+{
+  for (Clock::time_point end_of_period = Clock::now(); isRunning(end_of_period); end_of_period += period_)
+  {
+    execute();
   }
 }
 }

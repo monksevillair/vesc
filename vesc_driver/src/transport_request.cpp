@@ -12,24 +12,24 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_driver
 {
-  TransportRequest::TransportRequest(uint8_t controller_id, vesc_driver::PacketVariant &&packet, bool expect_response)
-      : controller_id_(controller_id), packet_(std::forward(packet)), expect_response_(expect_response)
-  {
-    ROS_DEBUG_STREAM("TransportRequest::TransportRequest packet type: " << packet_.type().name());
-  }
+TransportRequest::TransportRequest(uint8_t controller_id, RequestPacket&& packet, bool expect_response)
+  : controller_id_(controller_id), packet_(std::move(packet)), expect_response_(expect_response)
+{
+  ROS_DEBUG_STREAM("TransportRequest::TransportRequest packet type: " << packet_.type().name());
+}
 
-  uint8_t TransportRequest::getControllerId() const
-  {
-    return controller_id_;
-  }
+uint8_t TransportRequest::getControllerId() const
+{
+  return controller_id_;
+}
 
-  const PacketVariant& TransportRequest::getPacket() const
-  {
-    return packet_;
-  }
+const RequestPacket& TransportRequest::getPacket() const
+{
+  return packet_;
+}
 
-  bool TransportRequest::expectResponse() const
-  {
-    return expect_response_;
-  }
+bool TransportRequest::expectResponse() const
+{
+  return expect_response_;
+}
 }

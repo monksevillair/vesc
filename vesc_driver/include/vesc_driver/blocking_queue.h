@@ -29,7 +29,7 @@ public:
   {
     std::lock_guard<std::mutex> queue_lock(queue_mutex_);
 
-    queue_.push(std::forward(element));
+    queue_.push(std::move(element));
 
     queue_condition_variable_.notify_all();
   }

@@ -12,247 +12,135 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_driver
 {
-void SerialPacketCodec::encode(const PacketVariant& packet, ByteBuffer& buffer)
+void SerialPacketCodec::encode(SerialDataWriter& writer, const RequestPacket& packet)
 {
-  ROS_DEBUG_STREAM("SerialPacketCodec::encode packet type: " << packet.type().name());
-  Encoder encoder(buffer);
+  ROS_DEBUG_STREAM("SerialPacketCodec::encode: packet type: " << packet.type().name());
+  Encoder encoder(writer);
   boost::apply_visitor(encoder, packet);
 }
 
-boost::optional<vesc_driver::PacketVariant>
-SerialPacketCodec::decode(const vesc_driver::ByteBuffer& buffer)
+void SerialPacketCodec::encodeForwardCan(SerialDataWriter& writer, uint8_t controller_id, const RequestPacket& packet)
 {
-  ByteBuffer parsing_buffer = buffer;
-  if (buffer.getSize() < 1)
+  ROS_DEBUG_STREAM("SerialPacketCodec::encodeForwardCan: packet type: " << packet.type().name());
+  writePayloadId(writer, PayloadId::FORWARD_CAN);
+  writer.writeUnsignedInt8(controller_id);
+  Encoder encoder(writer);
+  boost::apply_visitor(encoder, packet);
+}
+
+boost::optional<vesc_driver::ResponsePacket> SerialPacketCodec::decode(SerialDataReader& payload_reader)
+{
+  if (!payload_reader.canRead())
   {
-    ROS_ERROR_STREAM("SerialPacketCodec::decode : got empty buffer, that should never happen");
+    ROS_ERROR_STREAM("SerialPacketCodec::decode : got empty payload, that should never happen");
   }
   else
   {
-    const uint8_t payload_id = parsing_buffer.parseUnsignedInt8();
+    const uint8_t payload_id = payload_reader.readUnsignedInt8();
     try
     {
       switch (payload_id)
       {
-        case Encoder::VESC_GET_VALUES_POSITION_PACKET:
-          ROS_DEBUG_STREAM("SerialPacketCodec::decode : Encoder::VESC_GET_VALUES_POSITION_PACKET");
-          return decodeMotorControllerState(parsing_buffer);
+        case static_cast<uint8_t>(PayloadId::GET_VALUES):
+          ROS_DEBUG_STREAM("SerialPacketCodec::decode: PayloadId::GET_VALUES");
+          return ResponsePacket(decodeMotorControllerState(payload_reader));
 
-        case Encoder::VESC_GET_FW_VERSION_PACKET:
-          ROS_DEBUG_STREAM("SerialPacketCodec::decode : Encoder::VESC_GET_FW_VERSION_PACKET");
-          return decodeFirmwareVersion(parsing_buffer);
+        case static_cast<uint8_t>(PayloadId::GET_FIRMWARE_VERSION):
+          ROS_DEBUG_STREAM("SerialPacketCodec::decode: Encoder::VESC_GET_FW_VERSION_PACKET");
+          return ResponsePacket(decodeFirmwareVersion(payload_reader));
 
         default:
           // we are not parsing any other packet
-          ROS_DEBUG_STREAM("SerialPacketCodec::decode : other payload id: " << static_cast<unsigned>(payload_id));
+          ROS_DEBUG_STREAM("SerialPacketCodec::decode: other payload id: " << static_cast<unsigned>(payload_id));
           break;
       }
     }
     catch (std::out_of_range&)
     {
-      ROS_ERROR_STREAM("SerialPacketCodec::decode : failed to decode packet with payload id "
+      ROS_ERROR_STREAM("SerialPacketCodec::decode: failed to decode packet with payload id "
                          << static_cast<unsigned>(payload_id));
     }
   }
   return boost::none;
 }
 
-void SerialPacketCodec::forwardCan(const PacketVariant& packet, ByteBuffer& buffer, uint8_t can_id)
+void SerialPacketCodec::writePayloadId(SerialDataWriter& writer, PayloadId payload_id)
 {
-  Encoder encoder(buffer);
-  boost::apply_visitor(encoder, packet);
-  encoder.forwardCan(can_id);
+  writer.writeUnsignedInt8(static_cast<uint8_t>(payload_id));
 }
 
-PacketVariant SerialPacketCodec::decodeMotorControllerState(ByteBuffer& buffer)
+MotorControllerState SerialPacketCodec::decodeMotorControllerState(SerialDataReader& reader)
 {
   MotorControllerState result;
-  buffer.advanceTo(5);
-  result.current_motor = buffer.parseFloat32() / 1e2;
-  result.current_input = buffer.parseFloat32() / 1e2;
+  reader.skipBytes(5);
+  result.current_motor = reader.readFloat32() / 1e2;
+  result.current_input = reader.readFloat32() / 1e2;
 
-  buffer.advanceTo(21);
-  result.duty_cycle = buffer.parseFloat16() / 1e3;
-  result.speed = buffer.parseFloat32() / 1e0;
-  result.voltage_input = buffer.parseFloat16() / 1e1;
-  result.charge_drawn = buffer.parseFloat32() / 1e4;
-  result.charge_regen = buffer.parseFloat32() / 1e4;
+  reader.skipBytes(8);
+  result.duty_cycle = reader.readFloat16() / 1e3;
+  result.speed = reader.readFloat32() / 1e0;
+  result.voltage_input = reader.readFloat16() / 1e1;
+  result.charge_drawn = reader.readFloat32() / 1e4;
+  result.charge_regen = reader.readFloat32() / 1e4;
 
-  buffer.advanceTo(45);
-  result.displacement = buffer.parseInt32();
-  result.distance_traveled = buffer.parseInt32();
-  result.fault_code = static_cast<MotorControllerState::FaultCode>(buffer.parseUnsignedInt8());
+  reader.skipBytes(8);
+  result.displacement = reader.readInt32();
+  result.distance_traveled = reader.readInt32();
+  result.fault_code = static_cast<MotorControllerState::FaultCode>(reader.readUnsignedInt8());
 
-  return PacketVariant(result);
+  return result;
 }
 
-PacketVariant SerialPacketCodec::decodeFirmwareVersion(ByteBuffer& buffer)
+FirmwareVersion SerialPacketCodec::decodeFirmwareVersion(SerialDataReader& reader)
 {
   FirmwareVersion result;
-  result.major_version = buffer.parseUnsignedInt8();
-  result.minor_version = buffer.parseUnsignedInt8();
-  return PacketVariant(result);
+  result.major_version = reader.readUnsignedInt8();
+  result.minor_version = reader.readUnsignedInt8();
+  return result;
+}
+
+SerialPacketCodec::Encoder::Encoder(SerialDataWriter& writer)
+  : writer_(writer)
+{
 }
 
 void SerialPacketCodec::Encoder::operator()(const SetDutyCyclePacket& packet)
 {
-  createHeader(VESC_SET_DUTY_CYCLE_PACKET_PAYLOAD_SIZE);
-  setPayloadID(VESC_SET_DUTY_CYCLE_PACKET);
-  buffer_.addFloat32(packet.duty_cycle * 1e5);
-  addCRC();
+  writePayloadId(writer_, PayloadId::SET_DUTY_CYCLE);
+  writer_.writeFloat32(packet.duty_cycle * 1e5);
 }
 
 void SerialPacketCodec::Encoder::operator()(const SetCurrentPacket& packet)
 {
-  createHeader(VESC_SET_CURRENT_PACKET_PAYLOAD_SIZE);
-  setPayloadID(VESC_SET_CURRENT_PACKET);
-  buffer_.addFloat32(packet.current * 1e3);
-  addCRC();
+  writePayloadId(writer_, PayloadId::SET_CURRENT);
+  writer_.writeFloat32(packet.current * 1e3);
 }
 
 void SerialPacketCodec::Encoder::operator()(const SetBrakePacket& packet)
 {
-  createHeader(VESC_SET_BRAKE_PACKET_PAYLOAD_SIZE);
-  setPayloadID(VESC_SET_BRAKE_PACKET);
-  buffer_.addFloat32(packet.brake_current * 1e3);
-  addCRC();
+  writePayloadId(writer_, PayloadId::SET_BRAKE);
+  writer_.writeFloat32(packet.brake_current * 1e3);
 }
 
 void SerialPacketCodec::Encoder::operator()(const SetSpeedPacket& packet)
 {
-  createHeader(VESC_SET_SPEED_PACKET_PAYLOAD_SIZE);
-  setPayloadID(VESC_SET_SPEED_PACKET);
-  buffer_.addFloat32(packet.speed);
-  addCRC();
-
-  ROS_DEBUG_STREAM("SerialPacketCodec::Encoder::operator<SetSpeedPacket>");
-  const auto encoded_bytes = static_cast<std::vector<uint8_t>>(buffer_);
-  for (auto byte : encoded_bytes)
-  {
-    ROS_DEBUG_STREAM("SerialPacketCodec::Encoder::operator<SetSpeedPacket> encoded_bytes: " << static_cast<int>(byte));
-  }
+  writePayloadId(writer_, PayloadId::SET_SPEED);
+  writer_.writeFloat32(packet.speed);
 }
 
 void SerialPacketCodec::Encoder::operator()(const SetPositionPacket& packet)
 {
-  createHeader(VESC_SET_POSITION_PACKET_PAYLOAD_SIZE);
-  setPayloadID(VESC_SET_POSITION_PACKET);
-  buffer_.addFloat32(packet.position * 1e6);
-  addCRC();
+  writePayloadId(writer_, PayloadId::SET_POSITION);
+  writer_.writeFloat32(packet.position * 1e6);
 }
 
 void SerialPacketCodec::Encoder::operator()(const GetValuesPacket& packet)
 {
-  createHeader(VESC_GET_VALUES_PACKET_PAYLOAD_SIZE);
-  setPayloadID(VESC_GET_VALUES_POSITION_PACKET);
-  addCRC();
-
-  ROS_DEBUG_STREAM("SerialPacketCodec::Encoder::operator<GetValuesPacket>");
-  const auto encoded_bytes = static_cast<std::vector<uint8_t>>(buffer_);
-  for (auto byte : encoded_bytes)
-  {
-    ROS_DEBUG_STREAM("SerialPacketCodec::Encoder::operator<GetValuesPacket> encoded_bytes: " << static_cast<int>(byte));
-  }
+  writePayloadId(writer_, PayloadId::GET_VALUES);
 }
 
-void SerialPacketCodec::Encoder::operator()(const MotorControllerState& packet)
+void SerialPacketCodec::Encoder::operator()(const GetFirmwareVersionPacket& packet)
 {
-  throw std::invalid_argument("motor controller state cannot be encoded");
-}
-
-void SerialPacketCodec::Encoder::operator()(const GetFirmwareVersion& packet)
-{
-  createHeader(VESC_GET_FW_VERSION_PACKET_PAYLOAD_SIZE);
-  setPayloadID(VESC_GET_FW_VERSION_PACKET);
-  addCRC();
-
-  ROS_DEBUG_STREAM("SerialPacketCodec::Encoder::operator<GetFirmwareVersion>");
-  const auto encoded_bytes = static_cast<std::vector<uint8_t>>(buffer_);
-  for (auto byte : encoded_bytes)
-  {
-    ROS_DEBUG_STREAM("SerialPacketCodec::Encoder::operator<GetFirmwareVersion> encoded_bytes: "
-                       << static_cast<int>(byte));
-  }
-}
-
-void SerialPacketCodec::Encoder::operator()(const FirmwareVersion& packet)
-{
-  throw std::invalid_argument("firmware version can not be encoded");
-}
-
-void SerialPacketCodec::Encoder::createHeader(const uint16_t payload_size)
-{
-  if (payload_size < std::numeric_limits<uint8_t>::max())
-  {
-    buffer_.addUnsignedInt8(VESC_SMALL_FRAME);
-    buffer_.addUnsignedInt8(static_cast<uint8_t>(payload_size));
-  }
-  else
-  {
-    buffer_.addUnsignedInt8(VESC_LARGE_FRAME);
-    buffer_.addUnsignedInt16(payload_size);
-  }
-}
-
-void SerialPacketCodec::Encoder::setPayloadID(uint8_t payload_id)
-{
-  buffer_.addUnsignedInt8(payload_id);
-}
-
-void SerialPacketCodec::Encoder::addCRC()
-{
-  buffer_.resetParsing();
-  uint8_t start_byte = buffer_.parseUnsignedInt8();
-
-  const size_t offset = (start_byte == VESC_SMALL_FRAME) ? 2 : 3;
-
-  const auto bytes = static_cast<std::vector<uint8_t>>(buffer_);
-  SerialPacketCodec::CRC crc_calculation;
-  crc_calculation.process_bytes(&bytes.at(offset), bytes.size() - offset);
-  const auto checksum = static_cast<uint16_t>(crc_calculation.checksum());
-  buffer_.addUnsignedInt16(checksum);
-  buffer_.addUnsignedInt8(VESC_EOF_BYTE);
-}
-
-void SerialPacketCodec::Encoder::forwardCan(uint8_t can_id)
-{
-  const auto encoded_bytes = static_cast<std::vector<uint8_t>>(buffer_);
-  for (const auto byte : encoded_bytes)
-  {
-    ROS_DEBUG_STREAM("SerialPacketCodec::Encoder::fowardCanen::1 coded_bytes: " << static_cast<int>(byte));
-  }
-
-  buffer_.resetParsing();
-  uint8_t start_byte = buffer_.parseUnsignedInt8();
-
-  uint16_t payload_size;
-  size_t offset = 1;
-  if (start_byte == VESC_SMALL_FRAME)
-  {
-    payload_size = buffer_.parseUnsignedInt8();
-    offset += 1;
-  }
-  else
-  {
-    payload_size = buffer_.parseUnsignedInt16();
-    offset += 2;
-  }
-
-  auto original_bytes = static_cast<std::vector<uint8_t>>(buffer_);
-  original_bytes.erase(original_bytes.begin(), original_bytes.begin() + offset);
-  original_bytes.erase(original_bytes.begin() + payload_size, original_bytes.end());
-  buffer_.clear();
-
-  createHeader(payload_size + VESC_FORWARD_CAN_PAYLOAD_SIZE);
-  setPayloadID(VESC_FORWARD_CAN);
-  buffer_.addUnsignedInt8(can_id);
-  buffer_.addBytes(original_bytes);
-  addCRC();
-
-  const auto encoded_bytes2 = static_cast<std::vector<uint8_t>>(buffer_);
-  for (const auto byte : encoded_bytes2)
-  {
-    ROS_DEBUG_STREAM("SerialPacketCodec::Encoder::forwardCan::2 encoded_bytes: " << static_cast<int>(byte));
-  }
+  writePayloadId(writer_, PayloadId::GET_FIRMWARE_VERSION);
 }
 }

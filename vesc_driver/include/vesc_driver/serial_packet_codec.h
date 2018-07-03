@@ -10,37 +10,39 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #ifndef VESC_DRIVER_SERIAL_PACKET_CODEC_H
 #define VESC_DRIVER_SERIAL_PACKET_CODEC_H
 
-#include <boost/crc.hpp>
 #include <boost/optional.hpp>
 #include <cstdint>
 #include <vesc_driver/packet.h>
-#include <vesc_driver/byte_buffer.h>
+#include <vesc_driver/serial_data_reader.h>
+#include <vesc_driver/serial_data_writer.h>
 
 namespace vesc_driver
 {
 class SerialPacketCodec
 {
 public:
-  virtual void encode(const PacketVariant& packet, ByteBuffer& buffer);
+  void encode(SerialDataWriter& writer, const RequestPacket& packet);
+  void encodeForwardCan(SerialDataWriter& writer, uint8_t controller_id, const RequestPacket& packet);
 
-  virtual boost::optional<PacketVariant> decode(const ByteBuffer& buffer);
-
-  virtual void forwardCan(const PacketVariant& packet, ByteBuffer& buffer, uint8_t can_id);
-
-  constexpr static size_t VESC_MIN_FRAME_SIZE = 5;
-  constexpr static size_t VESC_SMALL_FRAME = 2;
-  constexpr static size_t VESC_LARGE_FRAME = 3;
-  constexpr static size_t VESC_EOF_BYTE = 3;
-
-  typedef boost::crc_optimal<16, 0x1021, 0, 0, false, false> CRC;
+  boost::optional<ResponsePacket> decode(SerialDataReader& payload_reader);
 
 protected:
+  enum class PayloadId : uint8_t
+  {
+    GET_FIRMWARE_VERSION = 0,
+    GET_VALUES = 4,
+    SET_DUTY_CYCLE = 5,
+    SET_CURRENT = 6,
+    SET_BRAKE = 7,
+    SET_SPEED = 8,
+    SET_POSITION = 9,
+    FORWARD_CAN = 34,
+  };
+
   class Encoder : public boost::static_visitor<>
   {
   public:
-    Encoder(ByteBuffer& buffer)
-      : buffer_(buffer)
-    {}
+    explicit Encoder(SerialDataWriter& writer);
 
     void operator()(const SetDutyCyclePacket& packet);
     void operator()(const SetCurrentPacket& packet);
@@ -48,48 +50,15 @@ protected:
     void operator()(const SetSpeedPacket& packet);
     void operator()(const SetPositionPacket& packet);
     void operator()(const GetValuesPacket& packet);
-    void operator()(const MotorControllerState& packet);
-    void operator()(const GetFirmwareVersion& packet);
-    void operator()(const FirmwareVersion& packet);
-
-    void forwardCan(uint8_t can_id);
-
-    constexpr static uint8_t VESC_SET_DUTY_CYCLE_PACKET_PAYLOAD_SIZE = 5;
-    constexpr static uint8_t VESC_SET_DUTY_CYCLE_PACKET = 5;
-
-    constexpr static uint8_t VESC_SET_CURRENT_PACKET_PAYLOAD_SIZE = 5;
-    constexpr static uint8_t VESC_SET_CURRENT_PACKET = 6;
-
-    constexpr static uint8_t VESC_SET_BRAKE_PACKET_PAYLOAD_SIZE = 5;
-    constexpr static uint8_t VESC_SET_BRAKE_PACKET = 7;
-
-    constexpr static uint8_t VESC_SET_SPEED_PACKET_PAYLOAD_SIZE = 5;
-    constexpr static uint8_t VESC_SET_SPEED_PACKET = 8;
-
-    constexpr static uint8_t VESC_SET_POSITION_PACKET_PAYLOAD_SIZE = 5;
-    constexpr static uint8_t VESC_SET_POSITION_PACKET = 9;
-
-    constexpr static uint8_t VESC_GET_VALUES_PACKET_PAYLOAD_SIZE = 1;
-    constexpr static uint8_t VESC_GET_VALUES_POSITION_PACKET = 4;
-
-    constexpr static uint8_t VESC_GET_FW_VERSION_PACKET_PAYLOAD_SIZE = 1;
-    constexpr static uint8_t VESC_GET_FW_VERSION_PACKET = 0;
-
-    constexpr static uint8_t VESC_FORWARD_CAN_PAYLOAD_SIZE = 2;
-    constexpr static uint8_t VESC_FORWARD_CAN = 34;
+    void operator()(const GetFirmwareVersionPacket& packet);
 
   protected:
-    ByteBuffer& buffer_;
-
-    void createHeader(const uint16_t payload_size);
-
-    void setPayloadID(uint8_t payload_id);
-
-    void addCRC();
+    SerialDataWriter& writer_;
   };
 
-  PacketVariant decodeMotorControllerState(ByteBuffer& buffer);
-  PacketVariant decodeFirmwareVersion(ByteBuffer& buffer);
+  static void writePayloadId(SerialDataWriter& writer, PayloadId payload_id);
+  MotorControllerState decodeMotorControllerState(SerialDataReader& reader);
+  FirmwareVersion decodeFirmwareVersion(SerialDataReader& reader);
 };
 }
 

@@ -17,7 +17,9 @@ namespace vesc_driver
 class Transport
 {
 public:
-  typedef std::function<void(const PacketVariant&)> PacketHandler;
+  typedef std::function<void(const ResponsePacket&)> PacketHandler;
+
+  virtual ~Transport() = default;
 
   virtual void submit(TransportRequest&& r) = 0;
 

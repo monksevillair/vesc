@@ -44,7 +44,7 @@ struct GetValuesPacket
 {
 };
 
-struct GetFirmwareVersion
+struct GetFirmwareVersionPacket
 {
 };
 
@@ -55,7 +55,9 @@ struct FirmwareVersion
 };
 
 typedef boost::variant<SetDutyCyclePacket, SetCurrentPacket, SetBrakePacket, SetSpeedPacket, SetPositionPacket,
-                       GetValuesPacket, MotorControllerState, GetFirmwareVersion, FirmwareVersion> PacketVariant;
+                       GetValuesPacket, GetFirmwareVersionPacket> RequestPacket;
+
+typedef boost::variant<MotorControllerState, FirmwareVersion> ResponsePacket;
 }
 
 #endif //VESC_DRIVER_PACKET_H

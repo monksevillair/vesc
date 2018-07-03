@@ -18,17 +18,17 @@ namespace vesc_driver
 class TransportRequest
 {
 public:
-  TransportRequest(uint8_t controller_id, PacketVariant&& packet, bool expect_response = false);
+  TransportRequest(uint8_t controller_id, RequestPacket&& packet, bool expect_response = false);
 
   uint8_t getControllerId() const;
 
-  const PacketVariant& getPacket() const;
+  const RequestPacket& getPacket() const;
 
   bool expectResponse() const;
 
 protected:
   uint8_t controller_id_;
-  PacketVariant packet_;
+  RequestPacket packet_;
   bool expect_response_;
 };
 }
