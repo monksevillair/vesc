@@ -10,68 +10,52 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #ifndef VESC_MOTOR_VESC_STEERING_MOTOR_H
 #define VESC_MOTOR_VESC_STEERING_MOTOR_H
 
-#include <boost/shared_ptr.hpp>
-#include <boost/thread/mutex.hpp>
 #include <dynamic_reconfigure/server.h>
-#include <ros/node_handle.h>
-#include <ros/time.h>
+#include <mutex>
 #include <opencv2/core/core.hpp>
 #include <opencv2/video/tracking.hpp>
+#include <ros/node_handle.h>
+#include <ros/time.h>
 #include <vesc_motor/SteeringMotorConfig.h>
-#include <vesc_driver/vesc_driver_interface.h>
-#include <chrono>
+#include <vesc_motor/vesc_motor.h>
 #include <vesc_motor/vesc_transport_factory.h>
 
 namespace vesc_motor
 {
-  class VescSteeringMotor
-  {
-  public:
-    VescSteeringMotor(const ros::NodeHandle& private_nh, std::shared_ptr<VescTransportFactory> transport_factory,
-                      double execution_duration);
+class VescSteeringMotor : public VescMotor
+{
+public:
+  VescSteeringMotor(const ros::NodeHandle& private_nh, std::shared_ptr<VescTransportFactory> transport_factory,
+                    double execution_duration);
 
-    /**
-     * Gets the current position motor of the motor in rad, estimated at the given time.
-     * @param time time at which velocity is estimated.
-     * @return the estimated position in rad.
-     */
-    double getPosition(const ros::Time& time);
+  /**
+   * Gets the current position motor of the motor in rad, estimated at the given time.
+   * @param time time at which velocity is estimated.
+   * @return the estimated position in rad.
+   */
+  double getPosition(const ros::Time& time);
 
-    /**
-     * Commands the motor to the position in rad.
-     * @param position the position command in rad.
-     */
-    void setPosition(double position);
+  /**
+   * Commands the motor to the position in rad.
+   * @param position the position command in rad.
+   */
+  void setPosition(double position);
 
-    /**
-     * Gets the motor controller's supply voltage in V.
-     * @return the supply voltage in V.
-     */
-    double getSupplyVoltage();
+private:
+  void reconfigure(SteeringMotorConfig& config, uint32_t level);
+  void processMotorControllerState(const vesc_driver::MotorControllerState& state) override;
 
-  private:
-    void reconfigure(SteeringMotorConfig& config, uint32_t level);
-    void stateCB(const vesc_driver::MotorControllerState& state);
+  bool predict(const ros::Time& time);
+  void correct(double position);
 
-    bool predict(const ros::Time &time);
-    void correct(double position);
+  std::mutex config_mutex_;
+  dynamic_reconfigure::Server<SteeringMotorConfig> reconfigure_server_;
+  SteeringMotorConfig config_;
 
-    ros::NodeHandle private_nh_;
-    dynamic_reconfigure::Server<SteeringMotorConfig> reconfigure_server_;
-    SteeringMotorConfig config_;
-
-    std::shared_ptr<VescTransportFactory> transport_factory_;
-
-    std::chrono::duration<double> execution_duration_;
-
-    boost::mutex driver_mutex_;
-    boost::shared_ptr<vesc_driver::VescDriverInterface> driver_;
-
-    boost::mutex state_mutex_;
-    cv::KalmanFilter position_kf_;
-    ros::Time last_prediction_time_;
-    double supply_voltage_;
-  };
+  std::mutex state_mutex_;
+  cv::KalmanFilter position_kf_;
+  ros::Time last_prediction_time_;
+};
 }
 
 #endif //VESC_MOTOR_VESC_STEERING_MOTOR_H

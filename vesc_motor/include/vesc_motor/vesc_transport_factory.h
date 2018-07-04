@@ -10,23 +10,41 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #ifndef vesc_motor_VESC_TRANSPORT_FACTORY_H
 #define vesc_motor_VESC_TRANSPORT_FACTORY_H
 
-#include <ros/ros.h>
-#include <vesc_driver/serial_transport.h>
+#include <cstdint>
 #include <map>
+#include <memory>
+#include <ros/node_handle.h>
+#include <vesc_driver/transport.h>
 
 namespace vesc_motor
 {
 class VescTransportFactory
 {
 public:
-  explicit VescTransportFactory(const ros::NodeHandle &nh);
+  VescTransportFactory(const ros::NodeHandle& nh, const std::string& parameter_name = "transport_mapping");
 
-  std::shared_ptr<vesc_driver::SerialTransport> getSerialTransport(const std::string &transport_name);
+  /**
+   * Returns a transport by name.
+   *
+   * @throw std::out_of_range if no transport with the given name exists.
+   */
+  std::shared_ptr<vesc_driver::Transport> getTransport(const std::string& transport_name);
 
-private:
-  ros::NodeHandle nh_;
+  /**
+   * Creates a transport that connects to a VESC via serial port.
+   *
+   * @param controller_id the ID of the connected VESC. When messages to other IDs are sent over this transport, they
+   *                      will be forwarded via CAN.
+   * @param port the name of the serial port.
+   * @return the (already connected) transport.
+   */
+  std::shared_ptr<vesc_driver::Transport> createSerialTransport(uint8_t controller_id, const std::string& port);
 
-  std::map<std::string, std::shared_ptr<vesc_driver::SerialTransport>> transport_map_;
+protected:
+  template<typename T>
+  static T getRequiredParameter(XmlRpc::XmlRpcValue& transport_mapping, const std::string& parameter_name);
+
+  std::map<std::string, std::shared_ptr<vesc_driver::Transport>> transport_map_;
 };
 }
 

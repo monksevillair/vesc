@@ -7,17 +7,13 @@ All rights reserved.
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <vesc_motor/vesc_drive_motor.h>
-#include <boost/bind.hpp>
-#include <limits>
-#include <stdexcept>
-#include <vesc_driver/vesc_driver_serial.h>
-#include <vesc_driver/vesc_driver_mockup.h>
+#include <functional>
 
 namespace vesc_motor
 {
-VescDriveMotor::VescDriveMotor(const ros::NodeHandle& private_nh, std::shared_ptr<VescTransportFactory> transport_factory, double execution_duration)
-  : private_nh_(private_nh), reconfigure_server_(private_nh_), transport_factory_(transport_factory), execution_duration_(execution_duration),
-    supply_voltage_(std::numeric_limits<double>::quiet_NaN())
+VescDriveMotor::VescDriveMotor(const ros::NodeHandle& private_nh,
+                               std::shared_ptr<VescTransportFactory> transport_factory, double execution_duration)
+  : VescMotor(private_nh, transport_factory, execution_duration), reconfigure_server_(private_nh)
 {
   ROS_DEBUG_STREAM("VescDriveMotor::VescDriveMotor::1");
 
@@ -64,42 +60,37 @@ VescDriveMotor::VescDriveMotor(const ros::NodeHandle& private_nh, std::shared_pt
   cv::setIdentity(speed_kf_.errorCovPre);
   ROS_DEBUG_STREAM("VescDriveMotor::VescDriveMotor::9");
 
-  reconfigure_server_.setCallback(boost::bind(&VescDriveMotor::reconfigure, this, _1, _2));
+  reconfigure_server_.setCallback(
+    std::bind(&VescDriveMotor::reconfigure, this, std::placeholders::_1, std::placeholders::_2));
 
   ROS_DEBUG_STREAM("VescDriveMotor::VescDriveMotor::10");
 }
 
 double VescDriveMotor::getVelocity(const ros::Time& time)
 {
-  boost::mutex::scoped_lock state_lock(state_mutex_);
+  std::unique_lock<std::mutex> state_lock(state_mutex_);
   predict(time);
   return speed_kf_.statePre.at<float>(0);
 }
 
 void VescDriveMotor::setVelocity(double velocity)
 {
-  boost::mutex::scoped_lock driver_lock(driver_mutex_);
+  std::unique_lock<std::mutex> config_lock(config_mutex_);
   driver_->setSpeed(velocity * getVelocityConversionFactor());
 }
 
 void VescDriveMotor::brake(double current)
 {
-  boost::mutex::scoped_lock driver_lock(driver_mutex_);
+  std::unique_lock<std::mutex> config_lock(config_mutex_);
   driver_->setBrake(current);
-}
-
-double VescDriveMotor::getSupplyVoltage()
-{
-  boost::mutex::scoped_lock state_lock(state_mutex_);
-  return supply_voltage_;
 }
 
 void VescDriveMotor::reconfigure(DriveMotorConfig& config, uint32_t /*level*/)
 {
   ROS_DEBUG_STREAM("VescDriveMotor::reconfigure::1");
 
-  boost::mutex::scoped_lock driver_lock(driver_mutex_);
-  boost::mutex::scoped_lock state_lock(state_mutex_);
+  std::unique_lock<std::mutex> config_lock(config_mutex_);
+  std::unique_lock<std::mutex> state_lock(state_mutex_);
 
   ROS_DEBUG_STREAM("VescDriveMotor::reconfigure::1");
 
@@ -112,65 +103,14 @@ void VescDriveMotor::reconfigure(DriveMotorConfig& config, uint32_t /*level*/)
     ROS_ERROR("Parameter motor_poles is not set");
   }
 
-  if (config_.use_mockup)
-  {
-    ROS_DEBUG_STREAM("VescDriveMotor::reconfigure::3");
-
-    if (!boost::dynamic_pointer_cast<vesc_driver::VescDriverMockup>(driver_))
-    {
-      ROS_DEBUG_STREAM("VescDriveMotor::reconfigure::4");
-
-      driver_.reset(new vesc_driver::VescDriverMockup(execution_duration_, boost::bind(&VescDriveMotor::stateCB, this, _1)));
-    }
-  }
-  else
-  {
-    ROS_DEBUG_STREAM("VescDriveMotor::reconfigure::5");
-
-    if (!boost::dynamic_pointer_cast<vesc_driver::VescDriverSerial>(driver_))
-    {
-      ROS_DEBUG_STREAM("VescDriveMotor::reconfigure::6");
-
-      int controller_id;
-      private_nh_.getParam("controller_id", controller_id);
-
-      ROS_DEBUG_STREAM("VescDriveMotor::reconfigure::7");
-      ROS_DEBUG_STREAM("VescDriveMotor::reconfigure::7.1 controller_id: " << controller_id);
-
-      if (private_nh_.hasParam("port"))
-      {
-        ROS_DEBUG_STREAM("VescDriveMotor::reconfigure::8");
-
-        std::string port;
-        private_nh_.getParam("port", port);
-
-        ROS_DEBUG_STREAM("VescDriveMotor::reconfigure::8.1 port: " << port);
-
-        driver_.reset(new vesc_driver::VescDriverSerial(execution_duration_, boost::bind(&VescDriveMotor::stateCB, this, _1),
-                                                        controller_id, port));
-      }
-      else
-      {
-        ROS_DEBUG_STREAM("VescDriveMotor::reconfigure::9");
-
-        std::string transport_name;
-        private_nh_.getParam("transport_name", transport_name);
-
-        std::shared_ptr<vesc_driver::SerialTransport> transport = transport_factory_->getSerialTransport(transport_name);
-        driver_.reset(new vesc_driver::VescDriverSerial(execution_duration_, boost::bind(&VescDriveMotor::stateCB, this, _1),
-                                                        controller_id, transport));
-      }
-
-      ROS_DEBUG_STREAM("VescDriveMotor::reconfigure::10");
-    }
-  }
+  updateDriver(config_.use_mockup);
 }
 
-void VescDriveMotor::stateCB(const vesc_driver::MotorControllerState& state)
+void VescDriveMotor::processMotorControllerState(const vesc_driver::MotorControllerState& state)
 {
   ROS_DEBUG_STREAM("VescDriveMotor::stateCB::1");
 
-  boost::mutex::scoped_lock state_lock(state_mutex_);
+  std::unique_lock<std::mutex> state_lock(state_mutex_);
 
   ROS_DEBUG_STREAM("VescDriveMotor::stateCB::2");
 
@@ -188,7 +128,8 @@ void VescDriveMotor::stateCB(const vesc_driver::MotorControllerState& state)
 
   ROS_DEBUG_STREAM("VescDriveMotor::stateCB::4 state.voltage_input: " << state.voltage_input);
 
-  supply_voltage_ = state.voltage_input;
+  // Call super class implementation:
+  VescMotor::processMotorControllerState(state);
 }
 
 double VescDriveMotor::getVelocityConversionFactor() const
