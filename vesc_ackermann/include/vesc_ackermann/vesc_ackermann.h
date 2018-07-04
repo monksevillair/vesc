@@ -6,97 +6,94 @@ All rights reserved.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 #ifndef VESC_ACKERMANN_VESC_ACKERMANN_H
 #define VESC_ACKERMANN_VESC_ACKERMANN_H
 
-#include <dynamic_reconfigure/server.h>
 #include <ackermann_msgs/AckermannDrive.h>
+#include <dynamic_reconfigure/server.h>
 #include <tf/transform_broadcaster.h>
 #include <vesc_ackermann/AckermannConfig.h>
+#include <vesc_ackermann/axle.h>
 #include <vesc_motor/vesc_transport_factory.h>
-#include <vesc_ackermann/axis.h>
 
 namespace vesc_ackermann
 {
-  class VescAckermann
-  {
-  public:
-    VescAckermann(ros::NodeHandle private_nh);
+class VescAckermann
+{
+public:
+  explicit VescAckermann(ros::NodeHandle private_nh);
 
-  private:
-    void commandVelocityCB(const ackermann_msgs::AckermannDriveConstPtr &cmd_vel);
-    void calcOdomSpeed(const ros::Time &time);
-    double getSupplyVoltage();
+protected:
+  void commandVelocityCB(const ackermann_msgs::AckermannDriveConstPtr& cmd_vel);
+  void calcOdomSpeed(const ros::Time& time);
+  double getSupplyVoltage();
 
-    void reconfigure(AckermannConfig& config, uint32_t level);
-    void odomTimerCB(const ros::TimerEvent& event);
-    void updateOdometry(const ros::Time &time);
-    void publishOdom();
-    double ensureBounds(double value, double max);
-    double ensureBounds(double value, double min, double max);
-    void publishDoubleValue(const double &value, ros::Publisher &publisher);
+  void reconfigure(AckermannConfig& config, uint32_t level);
+  void odomTimerCB(const ros::TimerEvent& event);
+  void updateOdometry(const ros::Time& time);
+  void publishOdom();
+  double ensureBounds(double value, double max);
+  double ensureBounds(double value, double min, double max);
+  void publishDoubleValue(const double& value, ros::Publisher& publisher);
 
-  private:
-    AckermannConfig config_;
-    std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory_;
+  void calculateSteering(boost::optional<double> steering_center,
+                         const boost::optional<Axle::DriveMotorHelper>& drive_motors, double radius,
+                         double& steering_left, double& steering_right);
 
-    std::shared_ptr<Axis> front_axis_;
-    std::shared_ptr<Axis> rear_axis_;
+  double calculateRadius(boost::optional<double> steering,
+                         const boost::optional<Axle::DriveMotorHelper>& drive_motors);
 
-    bool initialized_;
+  void calculateOffset(double steering_left, double steering_right,
+                       const boost::optional<Axle::DriveMotorHelper>& drive_motors,
+                       double& left_x_wheel_offset, double& left_y_wheel_offset, double& right_x_wheel_offset,
+                       double& right_y_wheel_offset);
 
-    ros::NodeHandle private_nh_;
-    dynamic_reconfigure::Server<AckermannConfig> reconfigure_server_;
+  void calculateOffset(double steering, const boost::optional<Axle::DriveMotorHelper>& drive_motors,
+                       double& x_wheel_offset, double& y_wheel_offset);
 
-    ros::Time odom_update_time_;
+  double calculateLeftRotationVelocity(double radius, const boost::optional<Axle::DriveMotorHelper>& drive_motors,
+                                       double left_y_wheel_offset, double left_x_wheel_offset, double velocity);
 
-    double linear_velocity_odom_;
-    double angular_velocity_odom_;
+  double calculateRightRotationVelocity(double radius, const boost::optional<Axle::DriveMotorHelper>& drive_motors,
+                                        double left_y_wheel_offset, double left_x_wheel_offset, double velocity);
 
-    double x_odom_;
-    double y_odom_;
-    double yaw_odom_;
+  double calculateRotationVelocity(double y_offset, const boost::optional<Axle::DriveMotorHelper>& drive_motors,
+                                   double left_x_wheel_offset, double velocity);
 
-    ros::Publisher odom_pub_;
-    tf::TransformBroadcaster tf_broadcaster_;
-    ros::Publisher battery_voltage_pub_;
+  AckermannConfig config_;
+  std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory_;
 
-    ros::Subscriber cmd_vel_sub_;
+  std::shared_ptr<Axle> front_axis_;
+  std::shared_ptr<Axle> rear_axis_;
 
-    ros::Timer odom_timer_;
+  bool initialized_ = false;
 
-    boost::optional<double> old_front_steering_;
-    ros::Time old_front_steering_time_;
+  ros::NodeHandle private_nh_;
+  dynamic_reconfigure::Server<AckermannConfig> reconfigure_server_;
 
-    boost::optional<double> old_rear_steering_;
-    ros::Time old_rear_steering_time_;
+  ros::Time odom_update_time_;
 
-    void calculateSteering(boost::optional<double> steering_center,
-                           const boost::optional<Axis::DriveMotorHelper> &drive_motors, double radius,
-                           double &steering_left, double &steering_right);
+  double linear_velocity_odom_ = 0.0;
+  double angular_velocity_odom_ = 0.0;
 
-    double calculateRadius(boost::optional<double> steering,
-                           const boost::optional<Axis::DriveMotorHelper> &drive_motors);
+  double x_odom_ = 0.0;
+  double y_odom_ = 0.0;
+  double yaw_odom_ = 0.0;
 
-    void calculateOffset(double steering_left, double steering_right,
-                         const boost::optional<Axis::DriveMotorHelper> &drive_motors,
-                         double &left_x_wheel_offset, double &left_y_wheel_offset, double &right_x_wheel_offset,
-                         double &right_y_wheel_offset);
+  ros::Publisher odom_pub_;
+  tf::TransformBroadcaster tf_broadcaster_;
+  ros::Publisher battery_voltage_pub_;
 
-    void calculateOffset(double steering, const boost::optional<Axis::DriveMotorHelper> &drive_motors, double &x_wheel_offset,
-                       double &y_wheel_offset);
+  ros::Subscriber cmd_vel_sub_;
 
-    double calculateLeftRotationVelocity(double radius, const boost::optional<Axis::DriveMotorHelper> &drive_motors,
-                                         double left_y_wheel_offset, double left_x_wheel_offset, double velocity);
+  ros::Timer odom_timer_;
 
-    double calculateRightRotationVelocity(double radius, const boost::optional<Axis::DriveMotorHelper> &drive_motors,
-                                          double left_y_wheel_offset, double left_x_wheel_offset, double velocity);
+  boost::optional<double> old_front_steering_;
+  ros::Time old_front_steering_time_;
 
-
-    double calculateRotationVelocity(double y_offset, const boost::optional<Axis::DriveMotorHelper> &drive_motors,
-                                     double left_x_wheel_offset, double velocity);
-  };
+  boost::optional<double> old_rear_steering_;
+  ros::Time old_rear_steering_time_;
+};
 }
 
 

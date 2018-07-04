@@ -6,25 +6,26 @@ All rights reserved.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 #ifndef VESC_ACKERMANN_PUBLISH_HELPER_H
 #define VESC_ACKERMANN_PUBLISH_HELPER_H
 
-#include <ros/ros.h>
+#include <ros/node_handle.h>
+#include <ros/publisher.h>
+#include <string>
 
 namespace vesc_ackermann
 {
-  class PublishHelper
-  {
-  public:
-    PublishHelper(const std::string &topic_name, ros::NodeHandle nh, bool should_publish);
+class PublishHelper
+{
+public:
+  PublishHelper(const ros::NodeHandle& nh, const std::string& topic_name, bool should_publish);
 
-    void publishData(const double &value);
+  void publish(const double& value);
 
-  private:
-    ros::NodeHandle nh_;
-    ros::Publisher data_pub_;
-  };
+private:
+  ros::NodeHandle nh_;
+  ros::Publisher data_pub_;
+};
 }
 
 #endif //VESC_ACKERMANN_PUBLISH_HELPER_H
