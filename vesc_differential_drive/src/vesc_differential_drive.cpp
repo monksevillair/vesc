@@ -8,23 +8,22 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
  */
 
 #include <vesc_differential_drive/vesc_differential_drive.h>
-#include <boost/bind.hpp>
-#include <nav_msgs/Odometry.h>
 #include <angles/angles.h>
+#include <functional>
+#include <nav_msgs/Odometry.h>
 #include <std_msgs/Float32.h>
 
 namespace vesc_differential_drive
 {
 VescDifferentialDrive::VescDifferentialDrive(ros::NodeHandle private_nh, const ros::NodeHandle& left_motor_private_nh,
                                              const ros::NodeHandle& right_motor_private_nh)
-  : initialized_(false), private_nh_(private_nh), reconfigure_server_(private_nh_),
+  : private_nh_(private_nh), reconfigure_server_(private_nh_),
     transport_factory_(new vesc_motor::VescTransportFactory(private_nh_)),
-    left_motor_(left_motor_private_nh,transport_factory_, 1.0 / (config_.odometry_rate * 2.1)), left_motor_velocity_(0.),
-    right_motor_(right_motor_private_nh, transport_factory_, 1.0 / (config_.odometry_rate * 2.1)), right_motor_velocity_(0.),
-    linear_velocity_odom_(0.), angular_velocity_odom_(0.), x_odom_(0.), y_odom_(0.), yaw_odom_(0.)
+    left_motor_private_nh_(left_motor_private_nh), right_motor_private_nh_(right_motor_private_nh)
 {
   ROS_DEBUG_STREAM("VescDifferentialDrive::VescDifferentialDrive::1");
-  reconfigure_server_.setCallback(boost::bind(&VescDifferentialDrive::reconfigure, this, _1, _2));
+  reconfigure_server_.setCallback(
+    std::bind(&VescDifferentialDrive::reconfigure, this, std::placeholders::_1, std::placeholders::_2));
   ROS_DEBUG_STREAM("VescDifferentialDrive::VescDifferentialDrive::3");
 
   if (config_.publish_odom)
@@ -105,6 +104,17 @@ void VescDifferentialDrive::reconfigure(DifferentialDriveConfig& config, uint32_
   }
 
   config_ = config;
+
+  // Motors are created when the config is set for the first time (happens when reconfigure callback is set):
+  if (!left_motor_)
+  {
+    left_motor_.emplace(left_motor_private_nh_, transport_factory_, 1.0 / (config_.odometry_rate * 2.1));
+  }
+
+  if (!right_motor_)
+  {
+    right_motor_.emplace(right_motor_private_nh_, transport_factory_, 1.0 / (config_.odometry_rate * 2.1));
+  }
 }
 
 void VescDifferentialDrive::odomTimerCB(const ros::TimerEvent& event)
@@ -115,16 +125,16 @@ void VescDifferentialDrive::odomTimerCB(const ros::TimerEvent& event)
   {
     ROS_DEBUG_STREAM("VescDifferentialDrive::odomTimerCB::2");
 
-    left_motor_velocity_ = left_motor_.getVelocity(event.current_real);
+    left_motor_velocity_ = left_motor_->getVelocity(event.current_real);
     ROS_DEBUG_STREAM("VescDifferentialDrive::odomTimerCB::3");
 
-    right_motor_velocity_ = right_motor_.getVelocity(event.current_real);
+    right_motor_velocity_ = right_motor_->getVelocity(event.current_real);
     ROS_DEBUG_STREAM("VescDifferentialDrive::odomTimerCB::4");
 
     updateOdometry(event.current_real);
     ROS_DEBUG_STREAM("VescDifferentialDrive::odomTimerCB::5");
 
-    publishDoubleValue(left_motor_.getSupplyVoltage(), battery_voltage_pub_);
+    publishDoubleValue(left_motor_->getSupplyVoltage(), battery_voltage_pub_);
     ROS_DEBUG_STREAM("VescDifferentialDrive::odomTimerCB::6");
   }
 }
@@ -166,15 +176,15 @@ void VescDifferentialDrive::commandVelocityCB(const geometry_msgs::Twist& cmd_ve
                        << " right_rotational_velocity: " << right_rotational_velocity
                        << " left_motor_velocity: " << left_motor_velocity_
                        << " right_motor_velocity: " << right_motor_velocity_);
-    left_motor_.brake(config_.brake_current);
-    right_motor_.brake(config_.brake_current);
+    left_motor_->brake(config_.brake_current);
+    right_motor_->brake(config_.brake_current);
   }
   else
   {
     ROS_DEBUG_STREAM("VescDifferentialDrive::commandVelocityCB::8");
 
-    left_motor_.setVelocity(left_rotational_velocity);
-    right_motor_.setVelocity(right_rotational_velocity);
+    left_motor_->setVelocity(left_rotational_velocity);
+    right_motor_->setVelocity(right_rotational_velocity);
 
     if (config_.publish_motor_speed)
     {

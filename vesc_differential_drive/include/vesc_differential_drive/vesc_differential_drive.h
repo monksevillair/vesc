@@ -10,6 +10,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #ifndef VESC_DIFFERENTIAL_DRIVE_VESC_DIFFERENTIAL_DRIVE_H
 #define VESC_DIFFERENTIAL_DRIVE_VESC_DIFFERENTIAL_DRIVE_H
 
+#include <boost/optional.hpp>
 #include <dynamic_reconfigure/server.h>
 #include <geometry_msgs/Twist.h>
 #include <tf/transform_broadcaster.h>
@@ -35,7 +36,7 @@ private:
   double ensureBounds(double value, double min, double max);
   void publishDoubleValue(const double &value, ros::Publisher &publisher);
 
-  bool initialized_;
+  bool initialized_ = false;
 
   ros::NodeHandle private_nh_;
   dynamic_reconfigure::Server<DifferentialDriveConfig> reconfigure_server_;
@@ -43,20 +44,22 @@ private:
 
   std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory_;
 
-  vesc_motor::VescDriveMotor left_motor_;
-  double left_motor_velocity_;
+  ros::NodeHandle left_motor_private_nh_;
+  boost::optional<vesc_motor::VescDriveMotor> left_motor_;
+  double left_motor_velocity_ = 0.0;
 
-  vesc_motor::VescDriveMotor right_motor_;
-  double right_motor_velocity_;
+  ros::NodeHandle right_motor_private_nh_;
+  boost::optional<vesc_motor::VescDriveMotor> right_motor_;
+  double right_motor_velocity_ = 0.0;
 
   ros::Time odom_update_time_;
 
-  double linear_velocity_odom_;
-  double angular_velocity_odom_;
+  double linear_velocity_odom_ = 0.0;
+  double angular_velocity_odom_ = 0.0;
 
-  double x_odom_;
-  double y_odom_;
-  double yaw_odom_;
+  double x_odom_ = 0.0;
+  double y_odom_ = 0.0;
+  double yaw_odom_ = 0.0;
 
   ros::Publisher odom_pub_;
   tf::TransformBroadcaster tf_broadcaster_;
