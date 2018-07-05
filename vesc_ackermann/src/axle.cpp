@@ -13,11 +13,10 @@ namespace vesc_ackermann
 Axle::SteeringMotorHelper::SteeringMotorHelper(
   const ros::NodeHandle& private_nh, std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory,
   double execution_duration, bool publish_motor_position, double _steering_velocity, double _steering_tolerance,
-  double _max_steering_angle, bool _is_fixed)
+  double _max_steering_angle)
   : steering_velocity(_steering_velocity), steering_tolerance(_steering_tolerance),
     max_steering_angle(_max_steering_angle),
-    motor(private_nh, transport_factory, execution_duration, publish_motor_position),
-    is_fixed(_is_fixed)
+    motor(private_nh, transport_factory, execution_duration, publish_motor_position)
 {
 }
 
@@ -32,32 +31,23 @@ Axle::DriveMotorHelper::DriveMotorHelper(
 {
 }
 
-Axle::Axle(ros::NodeHandle nh, std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory,
-           double execution_duration, bool publish_motor_state, bool front_axle, double steering_tolerance,
-           double steering_angle_velocity, double max_steering_angle, double wheelbase, double wheel_diameter,
+Axle::Axle(ros::NodeHandle nh, const AxleConfig& config,
+           std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory,
+           double execution_duration, bool publish_motor_state, double steering_tolerance,
+           double steering_angle_velocity, double max_steering_angle, double wheelbase,
            double allowed_brake_velocity, double brake_velocity, double brake_current)
-  : front_axle_(front_axle), wheel_diameter_(wheel_diameter), allowed_brake_velocity_(allowed_brake_velocity),
+  : config_(config), wheelbase_(wheelbase), allowed_brake_velocity_(allowed_brake_velocity),
     brake_velocity_(brake_velocity), brake_current_(brake_current)
 {
-  const bool is_steered = nh.param<bool>("is_steered", false);
-  const bool is_fixed = nh.param<bool>("is_fixed", false);
-  if (is_steered || is_fixed)
+  if (config_.is_steered)
   {
-    const ros::NodeHandle steering_motor_private_nh(nh, "steering");
+    const ros::NodeHandle steering_motor_private_nh(nh, "steering_motor");
     steering_motor_.emplace(steering_motor_private_nh, transport_factory, execution_duration, publish_motor_state,
-                            steering_angle_velocity, steering_tolerance, max_steering_angle, is_fixed);
-  }
-  else
-  {
-    wheelbase = 0.0;
+                            steering_angle_velocity, steering_tolerance, max_steering_angle);
   }
 
-  const bool is_driven = nh.param<bool>("is_driven", false);
-  if (is_driven)
+  if (config_.is_driven)
   {
-    const double track_width = nh.param<double>("track_width", 0.0);
-    const double wheel_rotation_offset = nh.param<double>("wheel_rotation_offset", 0.0);
-
     const ros::NodeHandle left_motor_private_nh(nh, "left");
     const ros::NodeHandle right_motor_private_nh(nh, "right");
 
@@ -66,34 +56,26 @@ Axle::Axle(ros::NodeHandle nh, std::shared_ptr<vesc_motor::VescTransportFactory>
   }
 }
 
-boost::optional<double> Axle::getSteeringAngle(const ros::Time& time)
+double Axle::getSteeringAngle(const ros::Time& time)
 {
-  if (!steering_motor_ || steering_motor_->is_fixed)
+  if (steering_motor_)
   {
-    return boost::none;
+    return steering_motor_->getSteeringAngle(time);
   }
-
-  return steering_motor_->getSteeringAngle(time);
-}
-
-boost::optional<Axle::DriveMotorHelper>& Axle::getDriveMotors()
-{
-  return drive_motor_;
+  return 0.0;
 }
 
 void Axle::setSteeringAngle(double steering_angle)
 {
   if (steering_motor_)
   {
-    if (steering_motor_->is_fixed)
-    {
-      steering_motor_->setSteeringAngle(0.);
-    }
-    else
-    {
-      steering_motor_->setSteeringAngle(steering_angle * (front_axle_ ? 1. : -1.));
-    }
+    steering_motor_->setSteeringAngle(steering_angle);
   }
+}
+
+boost::optional<Axle::DriveMotorHelper>& Axle::getDriveMotors()
+{
+  return drive_motor_;
 }
 
 void Axle::setSpeed(double translation_speed, double rotation_speed)
@@ -188,28 +170,6 @@ void Axle::setSpeed(double translation_speed, double rotation_speed)
     drive_motor_->left_motor.setVelocity(velocity_left);
     drive_motor_->right_motor.setVelocity(velocity_right);
   }
-}
-
-bool Axle::isSteered()
-{
-  return static_cast<bool>(steering_motor_);
-}
-
-void Axle::halfWheelbase()
-{
-  if (drive_motor_)
-  {
-    drive_motor_->distance_to_wheel_base /= 2.;
-  }
-}
-
-boost::optional<double> Axle::getWheelbase()
-{
-  if (drive_motor_)
-  {
-    return drive_motor_->distance_to_wheel_base;
-  }
-  return boost::none;
 }
 
 double Axle::SteeringMotorHelper::getSteeringAngle(const ros::Time& time)

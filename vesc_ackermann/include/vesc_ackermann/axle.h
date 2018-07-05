@@ -12,8 +12,9 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <boost/optional.hpp>
 #include <memory>
 #include <ros/node_handle.h>
-#include <vesc_ackermann/vesc_drive_motor_decorator.h>
-#include <vesc_ackermann/vesc_steering_motor_decorator.h>
+#include <vesc_ackermann/AxleConfig.h>
+#include <vesc_ackermann/drive_motor.h>
+#include <vesc_ackermann/steering_motor.h>
 
 namespace vesc_ackermann
 {
@@ -25,7 +26,7 @@ public:
     SteeringMotorHelper(const ros::NodeHandle& private_nh,
                         std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory,
                         double execution_duration, bool publish_motor_position, double _steering_velocity,
-                        double _steering_tolerance, double _max_steering_angle, bool _is_fixed);
+                        double _steering_tolerance, double _max_steering_angle);
 
     double getSteeringAngle(const ros::Time& time);
 
@@ -36,8 +37,7 @@ public:
     double steering_velocity;
     double steering_tolerance;
     double max_steering_angle;
-    VescSteeringMotorDecorator motor;
-    bool is_fixed;
+    SteeringMotor motor;
   };
 
   struct DriveMotorHelper
@@ -51,37 +51,28 @@ public:
     double track_width;
     double wheel_rotation_offset;
 
-    VescDriveMotorDecorator left_motor;
-    VescDriveMotorDecorator right_motor;
+    DriveMotor left_motor;
+    DriveMotor right_motor;
   };
 
-  Axle(ros::NodeHandle nh, std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory,
-       double execution_duration, bool publish_motor_state, bool front_axle, double steering_tolerance,
-       double steering_angle_velocity, double max_steering_angle, double wheelbase, double wheel_diameter,
+  Axle(ros::NodeHandle nh, const AxleConfig& config, std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory,
+       double execution_duration, bool publish_motor_state, double steering_tolerance,
+       double steering_angle_velocity, double max_steering_angle, double wheelbase,
        double allowed_brake_velocity, double brake_velocity, double brake_current);
 
-  boost::optional<double> getSteeringAngle(const ros::Time& time);
+  double getSteeringAngle(const ros::Time& time);
   boost::optional<DriveMotorHelper>& getDriveMotors();
 
   void setSteeringAngle(double steering_angle);
   void setSpeed(double translation_speed, double rotation_speed);
 
-  bool isSteered();
-  void halfWheelbase();
-
-  boost::optional<double> getWheelbase();
-
 private:
-  bool front_axle_;
+  AxleConfig config_;
+  double wheelbase_;
 
   boost::optional<SteeringMotorHelper> steering_motor_;
 
   boost::optional<DriveMotorHelper> drive_motor_;
-
-  double wheel_diameter_;
-  double allowed_brake_velocity_;
-  double brake_velocity_;
-  double brake_current_;
 };
 }
 

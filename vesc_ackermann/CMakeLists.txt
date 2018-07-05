@@ -44,7 +44,7 @@ find_package(OpenCV)
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
 generate_dynamic_reconfigure_options(
   cfg/Ackermann.cfg
-  cfg/Axis.cfg
+  cfg/Axle.cfg
 )
 
 ###################################
@@ -81,10 +81,11 @@ include_directories(
 ## Declare a C++ library
 add_library(${PROJECT_NAME}
   src/axle.cpp include/vesc_ackermann/axle.h
-  src/publish_helper.cpp include/vesc_ackermann/publish_helper.h
+  src/drive_motor.cpp include/vesc_ackermann/drive_motor.h
+  include/vesc_ackermann/optional_data_publisher.h
+  src/steering_motor.cpp include/vesc_ackermann/steering_motor.h
   src/vesc_ackermann.cpp include/vesc_ackermann/vesc_ackermann.h
-  src/vesc_drive_motor_decorator.cpp include/vesc_ackermann/vesc_drive_motor_decorator.h
-  src/vesc_steering_motor_decorator.cpp include/vesc_ackermann/vesc_steering_motor_decorator.h
+  src/wheel.cpp include/vesc_ackermann/wheel.h
 )
 
 target_link_libraries(${PROJECT_NAME}

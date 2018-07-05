@@ -17,6 +17,8 @@ namespace vesc_ackermann
 {
 VescAckermann::VescAckermann(ros::NodeHandle private_nh)
   : private_nh_(private_nh), reconfigure_server_(private_nh_),
+    front_axle_reconfigure_server_(ros::NodeHandle(private_nh_, "front_axle")),
+    rear_axle_reconfigure_server_(ros::NodeHandle(private_nh_, "rear_axle")),
     transport_factory_(new vesc_motor::VescTransportFactory(private_nh_))
 {
   ROS_DEBUG_STREAM("VescAckermann::VescAckermann::4");
@@ -29,7 +31,10 @@ VescAckermann::VescAckermann(ros::NodeHandle private_nh)
 
   ROS_DEBUG_STREAM("VescAckermann::VescAckermann::1");
   reconfigure_server_.setCallback(boost::bind(&VescAckermann::reconfigure, this, _1, _2));
+  front_axle_reconfigure_server_.setCallback(boost::bind(&VescAckermann::reconfigureFrontAxle, this, _1, _2));
+  rear_axle_reconfigure_server_.setCallback(boost::bind(&VescAckermann::reconfigureRearAxle, this, _1, _2));
 
+  reinitialize();
   initialized_ = true;
 }
 
@@ -38,11 +43,6 @@ void VescAckermann::reconfigure(AckermannConfig& config, uint32_t /*level*/)
   if (config.max_velocity_linear == 0.0)
   {
     ROS_ERROR("Parameter max_velocity_linear is not set");
-  }
-
-  if (config.wheel_diameter == 0.0)
-  {
-    ROS_ERROR("Parameter wheel_diameter is not set");
   }
 
   if (config.allowed_brake_velocity == 0.0)
@@ -62,33 +62,101 @@ void VescAckermann::reconfigure(AckermannConfig& config, uint32_t /*level*/)
 
   config_ = config;
 
-  if (!front_axis_ && !rear_axis_)
+  if (initialized_)
   {
-    ros::NodeHandle front_axis_private_nh(private_nh_, "front_axis");
-    ros::NodeHandle rear_axis_private_nh(private_nh_, "rear_axis");
+    reinitialize();
+  }
+}
 
-    const double execution_duration = 1.0 / (config_.odometry_rate * 2.1);
+void VescAckermann::reconfigureFrontAxle(AxleConfig& config, uint32_t /*level*/)
+{
+  if (config.wheel_diameter == 0.0)
+  {
+    ROS_ERROR("Parameter wheel_diameter is not set");
+  }
 
-    front_axis_ = std::make_shared<Axle>(
-      front_axis_private_nh, transport_factory_, execution_duration, config_.publish_motor_speed, true,
-      config_.steering_tolerance, config_.steering_angle_velocity, config_.max_steering_angle, config_.wheelbase,
-      config_.wheel_diameter, config_.allowed_brake_velocity, config_.brake_velocity, config_.brake_current);
+  front_axle_config_ = config;
 
-    rear_axis_ = std::make_shared<Axle>(
-      rear_axis_private_nh, transport_factory_, execution_duration, config_.publish_motor_speed, false,
-      config_.steering_tolerance, config_.steering_angle_velocity, config_.max_steering_angle, config_.wheelbase,
-      config_.wheel_diameter, config_.allowed_brake_velocity, config_.brake_velocity, config_.brake_current);
+  if (initialized_)
+  {
+    reinitialize();
+  }
+}
 
-    if (front_axis_->isSteered() && rear_axis_->isSteered())
+void VescAckermann::reconfigureRearAxle(AxleConfig& config, uint32_t /*level*/)
+{
+  if (config.wheel_diameter == 0.0)
+  {
+    ROS_ERROR("Parameter wheel_diameter is not set");
+  }
+
+  rear_axle_config_ = config;
+
+  if (initialized_)
+  {
+    reinitialize();
+  }
+}
+
+void VescAckermann::reinitialize()
+{
+  const double execution_duration = 1.0 / (config_.odometry_rate * 2.1);
+
+  if (!front_axle_)
+  {
+    const ros::NodeHandle front_axle_private_nh(private_nh_, "front_axle");
+
+    double wheelbase = 0.0;
+    if (front_axle_config_.is_steered && rear_axle_config_.is_steered)
     {
-      front_axis_->halfWheelbase();
-      rear_axis_->halfWheelbase();
+      wheelbase = config_.wheelbase * (1.0 - config_.icr_line_relative_position);
     }
+    else if (front_axle_config_.is_steered)
+    {
+      wheelbase = config_.wheelbase;
+    }
+    else
+    {
+      wheelbase = 0.0;
+    }
+
+    front_axle_ = std::make_shared<Axle>(
+      front_axle_private_nh, transport_factory_, execution_duration, config_.publish_motor_speed, true,
+      config_.steering_angle_tolerance, config_.steering_angle_velocity, config_.max_steering_angle, wheelbase,
+      front_axle_config_.wheel_diameter, config_.allowed_brake_velocity, config_.brake_velocity, config_.brake_current);
+  }
+
+  if (!rear_axle_)
+  {
+    const ros::NodeHandle rear_axle_private_nh(private_nh_, "rear_axle");
+
+    double wheelbase = 0.0;
+    if (front_axle_config_.is_steered && rear_axle_config_.is_steered)
+    {
+      wheelbase = -config_.wheelbase * config_.icr_line_relative_position;
+    }
+    else if (rear_axle_config_.is_steered)
+    {
+      wheelbase = -config_.wheelbase;
+    }
+    else
+    {
+      wheelbase = 0.0;
+    }
+
+    rear_axle_ = std::make_shared<Axle>(
+      rear_axle_private_nh, transport_factory_, execution_duration, config_.publish_motor_speed, false,
+      config_.steering_angle_tolerance, config_.steering_angle_velocity, config_.max_steering_angle, wheelbase,
+      rear_axle_config_.wheel_diameter, config_.allowed_brake_velocity, config_.brake_velocity, config_.brake_current);
   }
 
   if (!odom_pub_ && config_.publish_odom)
   {
     odom_pub_ = private_nh_.advertise<nav_msgs::Odometry>("/odom", 1);
+  }
+  else if (odom_pub_ && !config_.publish_odom)
+  {
+    odom_pub_.shutdown();
   }
 
   if (!odom_timer_)
@@ -120,7 +188,7 @@ void VescAckermann::updateOdometry(const ros::Time& time)
   {
     const double time_difference = (time - odom_update_time_).toSec();
 
-    if (time_difference < 0.)
+    if (time_difference < 0.0)
     {
       ROS_WARN("time difference for odom update is negative, skipping update");
       return;
@@ -181,30 +249,23 @@ void VescAckermann::publishDoubleValue(const double& value, ros::Publisher& publ
 
 void VescAckermann::commandVelocityCB(const ackermann_msgs::AckermannDriveConstPtr& cmd_vel)
 {
-  if (!initialized_ || !front_axis_ || !rear_axis_)
-    return;
+  if (initialized_)
+  {
+    front_axle_->setSteeringAngle(cmd_vel->steering_angle);
+    rear_axle_->setSteeringAngle(cmd_vel->steering_angle);
 
-  front_axis_->setSteeringAngle(cmd_vel->steering_angle);
-  rear_axis_->setSteeringAngle(cmd_vel->steering_angle);
-
-  boost::optional<double> wheel_base;
-  wheel_base = front_axis_->getWheelbase();
-  if (!wheel_base)
-    wheel_base = rear_axis_->getWheelbase();
-
-  const double rotation_speed = (cmd_vel->speed * std::tan(cmd_vel->steering_angle)) / wheel_base.get();
-
-  front_axis_->setSpeed(cmd_vel->speed, rotation_speed);
-  rear_axis_->setSpeed(cmd_vel->speed, rotation_speed);
+    front_axle_->setSpeed(cmd_vel->speed, angular_velocity);
+    rear_axle_->setSpeed(cmd_vel->speed, angular_velocity);
+  }
 }
 
 double VescAckermann::getSupplyVoltage()
 {
-  boost::optional<Axle::DriveMotorHelper>& front_drive_motors = front_axis_->getDriveMotors();
+  boost::optional<Axle::DriveMotorHelper>& front_drive_motors = front_axle_->getDriveMotors();
   if (front_drive_motors)
     return front_drive_motors->left_motor.getSupplyVoltage();
 
-  boost::optional<Axle::DriveMotorHelper>& rear_drive_motors = rear_axis_->getDriveMotors();
+  boost::optional<Axle::DriveMotorHelper>& rear_drive_motors = rear_axle_->getDriveMotors();
   if (rear_drive_motors)
     return rear_drive_motors->left_motor.getSupplyVoltage();
 
@@ -213,8 +274,8 @@ double VescAckermann::getSupplyVoltage()
 
 void VescAckermann::calcOdomSpeed(const ros::Time& time)
 {
-  boost::optional<double> front_steering = front_axis_->getSteeringAngle(time);
-  boost::optional<Axle::DriveMotorHelper>& front_drive_motors = front_axis_->getDriveMotors();
+  boost::optional<double> front_steering = front_axle_->getSteeringAngle(time);
+  boost::optional<Axle::DriveMotorHelper>& front_drive_motors = front_axle_->getDriveMotors();
 
   double front_radius = calculateRadius(front_steering, front_drive_motors);
 
@@ -254,8 +315,8 @@ void VescAckermann::calcOdomSpeed(const ros::Time& time)
   calculateOffset(steering_front_left, steering_front_right, front_drive_motors, front_left_x_wheel_offset,
                   front_left_y_wheel_offset, front_right_x_wheel_offset, front_right_y_wheel_offset);
 
-  boost::optional<double> rear_steering = rear_axis_->getSteeringAngle(time);
-  boost::optional<Axle::DriveMotorHelper>& rear_drive_motors = rear_axis_->getDriveMotors();
+  boost::optional<double> rear_steering = rear_axle_->getSteeringAngle(time);
+  boost::optional<Axle::DriveMotorHelper>& rear_drive_motors = rear_axle_->getDriveMotors();
 
   double rear_radius = calculateRadius(rear_steering, rear_drive_motors);
 

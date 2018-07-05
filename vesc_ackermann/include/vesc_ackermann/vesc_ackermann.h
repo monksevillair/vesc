@@ -13,6 +13,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <dynamic_reconfigure/server.h>
 #include <tf/transform_broadcaster.h>
 #include <vesc_ackermann/AckermannConfig.h>
+#include <vesc_ackermann/AxleConfig.h>
 #include <vesc_ackermann/axle.h>
 #include <vesc_motor/vesc_transport_factory.h>
 
@@ -29,6 +30,10 @@ protected:
   double getSupplyVoltage();
 
   void reconfigure(AckermannConfig& config, uint32_t level);
+  void reconfigureFrontAxle(AxleConfig& config, uint32_t level);
+  void reconfigureRearAxle(AxleConfig& config, uint32_t level);
+  void reinitialize();
+
   void odomTimerCB(const ros::TimerEvent& event);
   void updateOdometry(const ros::Time& time);
   void publishOdom();
@@ -61,15 +66,19 @@ protected:
                                    double left_x_wheel_offset, double velocity);
 
   AckermannConfig config_;
+  AxleConfig front_axle_config_;
+  AxleConfig rear_axle_config_;
   std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory_;
 
-  std::shared_ptr<Axle> front_axis_;
-  std::shared_ptr<Axle> rear_axis_;
+  std::shared_ptr<Axle> front_axle_;
+  std::shared_ptr<Axle> rear_axle_;
 
   bool initialized_ = false;
 
   ros::NodeHandle private_nh_;
   dynamic_reconfigure::Server<AckermannConfig> reconfigure_server_;
+  dynamic_reconfigure::Server<AxleConfig> front_axle_reconfigure_server_;
+  dynamic_reconfigure::Server<AxleConfig> rear_axle_reconfigure_server_;
 
   ros::Time odom_update_time_;
 
