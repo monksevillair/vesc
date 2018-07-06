@@ -4,11 +4,17 @@
 #include <vesc_ackermann/wheel.h>
 #include <angles/angles.h>
 #include <cmath>
+#include <stdexcept>
 
 namespace vesc_ackermann
 {
-double Wheel::computeVelocity(const double linear_velocity, const double angular_velocity, const double steering_angle,
-                              const double steering_velocity) const
+Wheel::Wheel(const double position_x, const double position_y, const double hinge_position_y, const double radius)
+  : position_x_(position_x), position_y_(position_y), hinge_position_y_(hinge_position_y), radius_(radius)
+{
+}
+
+double Wheel::computeWheelVelocity(const double linear_velocity, const double angular_velocity,
+                                   const double steering_angle, const double steering_velocity) const
 {
   if (position_x_ == 0.0)
   {
@@ -24,6 +30,27 @@ double Wheel::computeVelocity(const double linear_velocity, const double angular
       + (angular_velocity + wheel_steering_velocity) * (hinge_position_y_ - position_y_);
 
   return tangential_velocity / radius_;
+}
+
+VehicleVelocity Wheel::computeVehicleVelocity(const double wheel_velocity, const double steering_angle,
+                                              const double steering_velocity) const
+{
+  if (position_x_ == 0.0)
+  {
+    throw std::logic_error("Cannot compute vehicle velocity for non-steered wheel");
+  }
+
+  const double wheel_steering_velocity = computeWheelSteeringVelocity(steering_angle, steering_velocity);
+
+  const double tan_steering_angle = std::tan(steering_angle);
+
+  // TODO: something with signs will be wrong here because of hypot():
+  const double normalized_linear_velocity
+    = (wheel_velocity * radius_ - wheel_steering_velocity * (hinge_position_y_ - position_y_))
+      / (std::hypot(tan_steering_angle * position_x_, tan_steering_angle * hinge_position_y_ - position_x_)
+        + tan_steering_angle * (hinge_position_y_ - position_y_));
+
+  return VehicleVelocity(normalized_linear_velocity * position_x_, normalized_linear_velocity * tan_steering_angle);
 }
 
 double Wheel::computeWheelSteeringAngle(const double steering_angle) const

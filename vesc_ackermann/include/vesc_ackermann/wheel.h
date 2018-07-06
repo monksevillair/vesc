@@ -4,6 +4,8 @@
 #ifndef VESC_ACKERMANN_WHEEL_H
 #define VESC_ACKERMANN_WHEEL_H
 
+#include <vesc_ackermann/vehicle_velocity.h>
+
 namespace vesc_ackermann
 {
 /**
@@ -16,6 +18,8 @@ namespace vesc_ackermann
 class Wheel
 {
 public:
+  Wheel(double position_x, double position_y, double hinge_position_y, double radius);
+
   /**
    * Computes the angular velocity (in rad/s) of the wheel given the intended movement of the vehicle.
    *
@@ -28,9 +32,12 @@ public:
    *   own position.
    * @return the angular velocity (in rad/s) of the wheel.
    */
-  double computeVelocity(double linear_velocity, double angular_velocity, double steering_angle,
-                         double steering_velocity) const;
+  double computeWheelVelocity(double linear_velocity, double angular_velocity, double steering_angle,
+                              double steering_velocity) const;
 
+  VehicleVelocity computeVehicleVelocity(double wheel_velocity, double steering_angle, double steering_velocity) const;
+
+protected:
   /**
    * Computes the steering angle of the wheel from the steering angle of the hypothetical central wheel, assuming ideal
    * Ackermann geometry.

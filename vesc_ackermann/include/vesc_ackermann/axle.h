@@ -9,70 +9,46 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #ifndef VESC_ACKERMANN_AXLE_H
 #define VESC_ACKERMANN_AXLE_H
 
+#include <ackermann_msgs/AckermannDrive.h>
 #include <boost/optional.hpp>
 #include <memory>
 #include <ros/node_handle.h>
+#include <vesc_ackermann/AckermannConfig.h>
 #include <vesc_ackermann/AxleConfig.h>
 #include <vesc_ackermann/drive_motor.h>
 #include <vesc_ackermann/steering_motor.h>
+#include <vesc_ackermann/vehicle_velocity.h>
+#include <vesc_ackermann/wheel.h>
 
 namespace vesc_ackermann
 {
 class Axle
 {
 public:
-  struct SteeringMotorHelper
-  {
-    SteeringMotorHelper(const ros::NodeHandle& private_nh,
-                        std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory,
-                        double execution_duration, bool publish_motor_position, double _steering_velocity,
-                        double _steering_tolerance, double _max_steering_angle);
+  Axle(const ros::NodeHandle& nh, const AckermannConfig& common_config, const AxleConfig& axle_config,
+       std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory, double position_x);
 
-    double getSteeringAngle(const ros::Time& time);
-
-    void setSteeringAngle(double steering_angle);
-
-    double last_steering_angle = 0.0;
-    double current_velocity = 0.0;
-    double steering_velocity;
-    double steering_tolerance;
-    double max_steering_angle;
-    SteeringMotor motor;
-  };
-
-  struct DriveMotorHelper
-  {
-    DriveMotorHelper(const ros::NodeHandle& left_motor_private_nh, const ros::NodeHandle& right_motor_private_nh,
-                     std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory,
-                     double execution_duration, bool publish_motor_speed, double _distance_to_wheel_base,
-                     double _track_width, double _wheel_rotation_offset);
-
-    double distance_to_wheel_base;
-    double track_width;
-    double wheel_rotation_offset;
-
-    DriveMotor left_motor;
-    DriveMotor right_motor;
-  };
-
-  Axle(ros::NodeHandle nh, const AxleConfig& config, std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory,
-       double execution_duration, bool publish_motor_state, double steering_tolerance,
-       double steering_angle_velocity, double max_steering_angle, double wheelbase,
-       double allowed_brake_velocity, double brake_velocity, double brake_current);
+  void setVelocity(double linear_velocity, double normalized_steering_angle, const ros::Time& time);
 
   double getSteeringAngle(const ros::Time& time);
-  boost::optional<DriveMotorHelper>& getDriveMotors();
+  boost::optional<VehicleVelocity> getVelocity(const ros::Time& time);
 
-  void setSteeringAngle(double steering_angle);
-  void setSpeed(double translation_speed, double rotation_speed);
+  boost::optional<double> getSupplyVoltage();
 
-private:
-  AxleConfig config_;
-  double wheelbase_;
+protected:
+  AckermannConfig common_config_;
+  AxleConfig axle_config_;
+  double position_x_;
 
-  boost::optional<SteeringMotorHelper> steering_motor_;
+  Wheel left_wheel_;
+  Wheel right_wheel_;
 
-  boost::optional<DriveMotorHelper> drive_motor_;
+  boost::optional<SteeringMotor> steering_motor_;
+  boost::optional<DriveMotor> left_motor_;
+  boost::optional<DriveMotor> right_motor_;
+
+  double last_steering_angle_ = 0.0;
+  ros::Time last_steering_angle_time_;
 };
 }
 

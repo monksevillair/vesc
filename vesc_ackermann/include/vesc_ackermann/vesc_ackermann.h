@@ -22,7 +22,7 @@ namespace vesc_ackermann
 class VescAckermann
 {
 public:
-  explicit VescAckermann(ros::NodeHandle private_nh);
+  explicit VescAckermann(const ros::NodeHandle& private_nh);
 
 protected:
   void commandVelocityCB(const ackermann_msgs::AckermannDriveConstPtr& cmd_vel);
@@ -41,33 +41,18 @@ protected:
   double ensureBounds(double value, double min, double max);
   void publishDoubleValue(const double& value, ros::Publisher& publisher);
 
-  void calculateSteering(boost::optional<double> steering_center,
-                         const boost::optional<Axle::DriveMotorHelper>& drive_motors, double radius,
-                         double& steering_left, double& steering_right);
-
-  double calculateRadius(boost::optional<double> steering,
-                         const boost::optional<Axle::DriveMotorHelper>& drive_motors);
-
-  void calculateOffset(double steering_left, double steering_right,
-                       const boost::optional<Axle::DriveMotorHelper>& drive_motors,
-                       double& left_x_wheel_offset, double& left_y_wheel_offset, double& right_x_wheel_offset,
-                       double& right_y_wheel_offset);
-
-  void calculateOffset(double steering, const boost::optional<Axle::DriveMotorHelper>& drive_motors,
-                       double& x_wheel_offset, double& y_wheel_offset);
-
-  double calculateLeftRotationVelocity(double radius, const boost::optional<Axle::DriveMotorHelper>& drive_motors,
-                                       double left_y_wheel_offset, double left_x_wheel_offset, double velocity);
-
-  double calculateRightRotationVelocity(double radius, const boost::optional<Axle::DriveMotorHelper>& drive_motors,
-                                        double left_y_wheel_offset, double left_x_wheel_offset, double velocity);
-
-  double calculateRotationVelocity(double y_offset, const boost::optional<Axle::DriveMotorHelper>& drive_motors,
-                                   double left_x_wheel_offset, double velocity);
+  ros::NodeHandle private_nh_;
+  ros::NodeHandle front_axle_private_nh_;
+  ros::NodeHandle rear_axle_private_nh_;
 
   AckermannConfig config_;
   AxleConfig front_axle_config_;
   AxleConfig rear_axle_config_;
+
+  dynamic_reconfigure::Server<AckermannConfig> reconfigure_server_;
+  dynamic_reconfigure::Server<AxleConfig> front_axle_reconfigure_server_;
+  dynamic_reconfigure::Server<AxleConfig> rear_axle_reconfigure_server_;
+
   std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory_;
 
   std::shared_ptr<Axle> front_axle_;
@@ -75,15 +60,9 @@ protected:
 
   bool initialized_ = false;
 
-  ros::NodeHandle private_nh_;
-  dynamic_reconfigure::Server<AckermannConfig> reconfigure_server_;
-  dynamic_reconfigure::Server<AxleConfig> front_axle_reconfigure_server_;
-  dynamic_reconfigure::Server<AxleConfig> rear_axle_reconfigure_server_;
-
   ros::Time odom_update_time_;
 
-  double linear_velocity_odom_ = 0.0;
-  double angular_velocity_odom_ = 0.0;
+  VehicleVelocity velocity_odom_;
 
   double x_odom_ = 0.0;
   double y_odom_ = 0.0;
@@ -96,12 +75,6 @@ protected:
   ros::Subscriber cmd_vel_sub_;
 
   ros::Timer odom_timer_;
-
-  boost::optional<double> old_front_steering_;
-  ros::Time old_front_steering_time_;
-
-  boost::optional<double> old_rear_steering_;
-  ros::Time old_rear_steering_time_;
 };
 }
 

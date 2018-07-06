@@ -68,7 +68,7 @@ catkin_package(
 ###########
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-add_compile_options(-std=c++11)
+add_compile_options(-std=c++11 -Wall -Wextra)
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
@@ -84,6 +84,7 @@ add_library(${PROJECT_NAME}
   src/drive_motor.cpp include/vesc_ackermann/drive_motor.h
   include/vesc_ackermann/optional_data_publisher.h
   src/steering_motor.cpp include/vesc_ackermann/steering_motor.h
+  src/vehicle_velocity.cpp include/vesc_ackermann/vehicle_velocity.h
   src/vesc_ackermann.cpp include/vesc_ackermann/vesc_ackermann.h
   src/wheel.cpp include/vesc_ackermann/wheel.h
 )

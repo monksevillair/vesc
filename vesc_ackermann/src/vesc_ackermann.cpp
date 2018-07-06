@@ -15,11 +15,11 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_ackermann
 {
-VescAckermann::VescAckermann(ros::NodeHandle private_nh)
-  : private_nh_(private_nh), reconfigure_server_(private_nh_),
-    front_axle_reconfigure_server_(ros::NodeHandle(private_nh_, "front_axle")),
-    rear_axle_reconfigure_server_(ros::NodeHandle(private_nh_, "rear_axle")),
-    transport_factory_(new vesc_motor::VescTransportFactory(private_nh_))
+VescAckermann::VescAckermann(const ros::NodeHandle& private_nh)
+  : private_nh_(private_nh), front_axle_private_nh_(private_nh_, "front_axle"),
+    rear_axle_private_nh_(private_nh_, "rear_axle"), reconfigure_server_(private_nh_),
+    front_axle_reconfigure_server_(front_axle_private_nh_), rear_axle_reconfigure_server_(rear_axle_private_nh_),
+    transport_factory_(std::make_shared<vesc_motor::VescTransportFactory>(private_nh_)), velocity_odom_(0.0, 0.0)
 {
   ROS_DEBUG_STREAM("VescAckermann::VescAckermann::4");
 
@@ -100,54 +100,36 @@ void VescAckermann::reconfigureRearAxle(AxleConfig& config, uint32_t /*level*/)
 
 void VescAckermann::reinitialize()
 {
-  const double execution_duration = 1.0 / (config_.odometry_rate * 2.1);
-
   if (!front_axle_)
   {
-    const ros::NodeHandle front_axle_private_nh(private_nh_, "front_axle");
-
-    double wheelbase = 0.0;
+    double position_x = 0.0;
     if (front_axle_config_.is_steered && rear_axle_config_.is_steered)
     {
-      wheelbase = config_.wheelbase * (1.0 - config_.icr_line_relative_position);
+      position_x = config_.wheelbase * (1.0 - config_.icr_line_relative_position);
     }
     else if (front_axle_config_.is_steered)
     {
-      wheelbase = config_.wheelbase;
-    }
-    else
-    {
-      wheelbase = 0.0;
+      position_x = config_.wheelbase;
     }
 
-    front_axle_ = std::make_shared<Axle>(
-      front_axle_private_nh, transport_factory_, execution_duration, config_.publish_motor_speed, true,
-      config_.steering_angle_tolerance, config_.steering_angle_velocity, config_.max_steering_angle, wheelbase,
-      front_axle_config_.wheel_diameter, config_.allowed_brake_velocity, config_.brake_velocity, config_.brake_current);
+    front_axle_ = std::make_shared<Axle>(front_axle_private_nh_, config_, front_axle_config_, transport_factory_,
+                                         position_x);
   }
 
   if (!rear_axle_)
   {
-    const ros::NodeHandle rear_axle_private_nh(private_nh_, "rear_axle");
-
-    double wheelbase = 0.0;
+    double position_x = 0.0;
     if (front_axle_config_.is_steered && rear_axle_config_.is_steered)
     {
-      wheelbase = -config_.wheelbase * config_.icr_line_relative_position;
+      position_x = -config_.wheelbase * config_.icr_line_relative_position;
     }
     else if (rear_axle_config_.is_steered)
     {
-      wheelbase = -config_.wheelbase;
-    }
-    else
-    {
-      wheelbase = 0.0;
+      position_x = -config_.wheelbase;
     }
 
-    rear_axle_ = std::make_shared<Axle>(
-      rear_axle_private_nh, transport_factory_, execution_duration, config_.publish_motor_speed, false,
-      config_.steering_angle_tolerance, config_.steering_angle_velocity, config_.max_steering_angle, wheelbase,
-      rear_axle_config_.wheel_diameter, config_.allowed_brake_velocity, config_.brake_velocity, config_.brake_current);
+    rear_axle_ = std::make_shared<Axle>(rear_axle_private_nh_, config_, rear_axle_config_, transport_factory_,
+                                        position_x);
   }
 
   if (!odom_pub_ && config_.publish_odom)
@@ -161,8 +143,8 @@ void VescAckermann::reinitialize()
 
   if (!odom_timer_)
   {
-    odom_timer_ = private_nh_.createTimer(ros::Duration(1.0 / config_.odometry_rate),
-                                          &VescAckermann::odomTimerCB, this);
+    odom_timer_ = private_nh_.createTimer(ros::Duration(1.0 / config_.odometry_rate), &VescAckermann::odomTimerCB,
+                                          this);
   }
 }
 
@@ -194,9 +176,9 @@ void VescAckermann::updateOdometry(const ros::Time& time)
       return;
     }
 
-    x_odom_ += linear_velocity_odom_ * std::cos(yaw_odom_) * time_difference;
-    y_odom_ += linear_velocity_odom_ * std::sin(yaw_odom_) * time_difference;
-    yaw_odom_ = angles::normalize_angle(yaw_odom_ + angular_velocity_odom_ * time_difference);
+    x_odom_ += velocity_odom_.linear_velocity * std::cos(yaw_odom_) * time_difference;
+    y_odom_ += velocity_odom_.linear_velocity * std::sin(yaw_odom_) * time_difference;
+    yaw_odom_ = angles::normalize_angle(yaw_odom_ + velocity_odom_.angular_velocity * time_difference);
   }
 
   odom_update_time_ = time;
@@ -217,8 +199,8 @@ void VescAckermann::publishOdom()
 
     tf::poseTFToMsg(odom_pose, odom_msg.pose.pose);
 
-    odom_msg.twist.twist.linear.x = linear_velocity_odom_;
-    odom_msg.twist.twist.angular.z = angular_velocity_odom_;
+    odom_msg.twist.twist.linear.x = velocity_odom_.linear_velocity;
+    odom_msg.twist.twist.angular.z = velocity_odom_.angular_velocity;
 
     odom_pub_.publish(odom_msg);
   }
@@ -251,312 +233,88 @@ void VescAckermann::commandVelocityCB(const ackermann_msgs::AckermannDriveConstP
 {
   if (initialized_)
   {
-    front_axle_->setSteeringAngle(cmd_vel->steering_angle);
-    rear_axle_->setSteeringAngle(cmd_vel->steering_angle);
+    // TODO: this assumes that the steering velocity in the message is related to the vehicle wheelbase. Is this correct?
+    const double steering_angle = std::max(std::min<double>(cmd_vel->steering_angle, config_.max_steering_angle),
+                                           -config_.max_steering_angle);
+    const double normalized_steering_angle = std::atan2(std::tan(steering_angle), config_.wheelbase);
 
-    front_axle_->setSpeed(cmd_vel->speed, angular_velocity);
-    rear_axle_->setSpeed(cmd_vel->speed, angular_velocity);
+    const ros::Time now = ros::Time::now();
+    front_axle_->setVelocity(cmd_vel->speed, normalized_steering_angle, now);
+    rear_axle_->setVelocity(cmd_vel->speed, normalized_steering_angle, now);
   }
 }
 
 double VescAckermann::getSupplyVoltage()
 {
-  boost::optional<Axle::DriveMotorHelper>& front_drive_motors = front_axle_->getDriveMotors();
-  if (front_drive_motors)
-    return front_drive_motors->left_motor.getSupplyVoltage();
+  double supply_voltage = 0.0;
+  int num_measurements = 0;
 
-  boost::optional<Axle::DriveMotorHelper>& rear_drive_motors = rear_axle_->getDriveMotors();
-  if (rear_drive_motors)
-    return rear_drive_motors->left_motor.getSupplyVoltage();
+  const boost::optional<double> front_supply_voltage = front_axle_->getSupplyVoltage();
+  if (front_supply_voltage)
+  {
+    supply_voltage += *front_supply_voltage;
+    ++num_measurements;
+  }
 
-  return 0.;
+  const boost::optional<double> rear_supply_voltage = rear_axle_->getSupplyVoltage();
+  if (rear_supply_voltage)
+  {
+    supply_voltage += *rear_supply_voltage;
+    ++num_measurements;
+  }
+
+  if (num_measurements != 0)
+  {
+    return supply_voltage / num_measurements;
+  }
+  return std::numeric_limits<double>::quiet_NaN();
 }
 
 void VescAckermann::calcOdomSpeed(const ros::Time& time)
 {
-  boost::optional<double> front_steering = front_axle_->getSteeringAngle(time);
-  boost::optional<Axle::DriveMotorHelper>& front_drive_motors = front_axle_->getDriveMotors();
+  std::vector<VehicleVelocity> velocities;
 
-  double front_radius = calculateRadius(front_steering, front_drive_motors);
-
-  double steering_front_left;
-  double steering_front_right;
-  calculateSteering(front_steering, front_drive_motors, front_radius, steering_front_left, steering_front_right);
-
-  double front_left_velocity_correction = 0.;
-  double front_right_velocity_correction = 0.;
-  if (front_steering && old_front_steering_ && (time >= old_front_steering_time_))
+  if (front_axle_config_.is_driven)
   {
-    double old_front_radius = calculateRadius(old_front_steering_, front_drive_motors);
+    const VehicleVelocity front_axle_velocity = *front_axle_->getVelocity(time);
 
-    double old_steering_front_left;
-    double old_steering_front_right;
-    calculateSteering(old_front_steering_, front_drive_motors, old_front_radius, old_steering_front_left,
-                      old_steering_front_right);
-
-    double time_difference = (time - old_front_steering_time_).toSec();
-
-    double delta_front_left = (steering_front_left - old_steering_front_left) / time_difference;
-    double delta_front_right = (steering_front_right - old_steering_front_right) / time_difference;
-
-    if (front_drive_motors)
+    if (front_axle_config_.is_steered)
     {
-      front_left_velocity_correction = delta_front_left * front_drive_motors->wheel_rotation_offset;
-      front_right_velocity_correction = -(delta_front_right * front_drive_motors->wheel_rotation_offset);
+      velocities.emplace_back(front_axle_velocity);
     }
-  }
-  old_front_steering_ = front_steering;
-  old_front_steering_time_ = time;
-
-  double front_left_x_wheel_offset;
-  double front_left_y_wheel_offset;
-  double front_right_x_wheel_offset;
-  double front_right_y_wheel_offset;
-  calculateOffset(steering_front_left, steering_front_right, front_drive_motors, front_left_x_wheel_offset,
-                  front_left_y_wheel_offset, front_right_x_wheel_offset, front_right_y_wheel_offset);
-
-  boost::optional<double> rear_steering = rear_axle_->getSteeringAngle(time);
-  boost::optional<Axle::DriveMotorHelper>& rear_drive_motors = rear_axle_->getDriveMotors();
-
-  double rear_radius = calculateRadius(rear_steering, rear_drive_motors);
-
-  double steering_rear_left;
-  double steering_rear_right;
-  calculateSteering(rear_steering, rear_drive_motors, rear_radius, steering_rear_left, steering_rear_right);
-
-  double rear_left_velocity_correction = 0.;
-  double rear_right_velocity_correction = 0.;
-  if (rear_steering && old_rear_steering_ && (time >= old_rear_steering_time_))
-  {
-    double old_rear_radius = calculateRadius(old_rear_steering_, rear_drive_motors);
-
-    double old_steering_rear_left;
-    double old_steering_rear_right;
-    calculateSteering(old_rear_steering_, rear_drive_motors, old_rear_radius, old_steering_rear_left,
-                      old_steering_rear_right);
-
-    double time_difference = (time - old_rear_steering_time_).toSec();
-
-    double delta_rear_left = (steering_rear_left - old_steering_rear_left) / time_difference;
-    double delta_rear_right = (steering_rear_right - old_steering_rear_right) / time_difference;
-
-    if (rear_drive_motors)
+    else if (rear_axle_config_.is_steered)
     {
-      rear_left_velocity_correction = delta_rear_left * rear_drive_motors->wheel_rotation_offset;
-      rear_right_velocity_correction = -(delta_rear_right * rear_drive_motors->wheel_rotation_offset);
-    }
-  }
-  old_front_steering_ = front_steering;
-  old_front_steering_time_ = time;
-
-  double rear_left_x_wheel_offset;
-  double rear_left_y_wheel_offset;
-  double rear_right_x_wheel_offset;
-  double rear_right_y_wheel_offset;
-  calculateOffset(steering_rear_left, steering_rear_right, rear_drive_motors, rear_left_x_wheel_offset,
-                  rear_left_y_wheel_offset, rear_right_x_wheel_offset, rear_right_y_wheel_offset);
-
-  std::vector<double> rotation_velocities;
-  std::vector<double> translation_velocities;
-
-  boost::optional<double> front_left_velocity;
-  boost::optional<double> front_right_velocity;
-  if (front_drive_motors)
-  {
-    front_left_velocity = front_drive_motors->left_motor.getVelocity(time) + front_left_velocity_correction;
-    front_right_velocity = front_drive_motors->right_motor.getVelocity(time) + front_right_velocity_correction;
-  }
-
-  boost::optional<double> rear_left_velocity;
-  boost::optional<double> rear_right_velocity;
-  if (rear_drive_motors)
-  {
-    rear_left_velocity = rear_drive_motors->left_motor.getVelocity(time) + rear_left_velocity_correction;
-    rear_right_velocity = rear_drive_motors->right_motor.getVelocity(time) + rear_right_velocity_correction;
-  }
-
-  if (front_steering)
-  {
-    if (front_left_velocity)
-    {
-      double new_rotation_velocity = calculateLeftRotationVelocity(front_radius, front_drive_motors,
-                                                                   front_left_y_wheel_offset,
-                                                                   front_left_x_wheel_offset,
-                                                                   front_left_velocity.get());
-      rotation_velocities.push_back(new_rotation_velocity);
-      translation_velocities.push_back(new_rotation_velocity * front_radius);
-    }
-
-    if (front_right_velocity)
-    {
-      double new_rotation_velocity = calculateRightRotationVelocity(front_radius, front_drive_motors,
-                                                                    front_right_y_wheel_offset,
-                                                                    front_right_x_wheel_offset,
-                                                                    front_right_velocity.get());
-      rotation_velocities.push_back(new_rotation_velocity);
-      translation_velocities.push_back(new_rotation_velocity * front_radius);
-    }
-
-    if (rear_left_velocity)
-    {
-      double new_rotation_velocity = calculateLeftRotationVelocity(front_radius, rear_drive_motors,
-                                                                   rear_left_y_wheel_offset,
-                                                                   rear_left_x_wheel_offset,
-                                                                   rear_left_velocity.get());
-      rotation_velocities.push_back(new_rotation_velocity);
-      translation_velocities.push_back(new_rotation_velocity * front_radius);
-    }
-
-    if (rear_right_velocity)
-    {
-      double new_rotation_velocity = calculateRightRotationVelocity(front_radius, rear_drive_motors,
-                                                                    rear_right_y_wheel_offset,
-                                                                    rear_right_x_wheel_offset,
-                                                                    rear_right_velocity.get());
-      rotation_velocities.push_back(new_rotation_velocity);
-      translation_velocities.push_back(new_rotation_velocity * front_radius);
+      const double tan_rear_steering_angle = std::tan(rear_axle_->getSteeringAngle(time));
+      velocities.emplace_back(front_axle_velocity.linear_velocity,
+                              front_axle_velocity.linear_velocity * tan_rear_steering_angle / -config_.wheelbase);
     }
   }
 
-  if (rear_steering)
+  if (rear_axle_config_.is_driven)
   {
-    if (front_left_velocity)
-    {
-      double new_rotation_velocity = calculateLeftRotationVelocity(rear_radius, front_drive_motors,
-                                                                   front_left_y_wheel_offset,
-                                                                   front_left_x_wheel_offset,
-                                                                   front_left_velocity.get());
-      rotation_velocities.push_back(new_rotation_velocity);
-      translation_velocities.push_back(new_rotation_velocity * rear_radius);
-    }
+    const VehicleVelocity rear_axle_velocity = *rear_axle_->getVelocity(time);
 
-    if (front_right_velocity)
+    if (rear_axle_config_.is_steered)
     {
-      double new_rotation_velocity = calculateRightRotationVelocity(rear_radius, front_drive_motors,
-                                                                    front_right_y_wheel_offset,
-                                                                    front_right_x_wheel_offset,
-                                                                    front_right_velocity.get());
-      rotation_velocities.push_back(new_rotation_velocity);
-      translation_velocities.push_back(new_rotation_velocity * rear_radius);
+      velocities.emplace_back(rear_axle_velocity);
     }
-
-    if (rear_left_velocity)
+    else if (front_axle_config_.is_steered)
     {
-      double new_rotation_velocity = calculateLeftRotationVelocity(rear_radius, rear_drive_motors,
-                                                                   rear_left_y_wheel_offset,
-                                                                   rear_left_x_wheel_offset,
-                                                                   rear_left_velocity.get());
-      rotation_velocities.push_back(new_rotation_velocity);
-      translation_velocities.push_back(new_rotation_velocity * rear_radius);
-    }
-
-    if (rear_right_velocity)
-    {
-      double new_rotation_velocity = calculateRightRotationVelocity(rear_radius, rear_drive_motors,
-                                                                    rear_right_y_wheel_offset,
-                                                                    rear_right_x_wheel_offset,
-                                                                    rear_right_velocity.get());
-      rotation_velocities.push_back(new_rotation_velocity);
-      translation_velocities.push_back(new_rotation_velocity * rear_radius);
+      const double tan_front_steering_angle = std::tan(front_axle_->getSteeringAngle(time));
+      velocities.emplace_back(rear_axle_velocity.linear_velocity,
+                              rear_axle_velocity.linear_velocity * tan_front_steering_angle / config_.wheelbase);
     }
   }
 
-  angular_velocity_odom_ = 0.;
-  for (double new_rotation_velocity : rotation_velocities)
-    angular_velocity_odom_ += new_rotation_velocity;
-  angular_velocity_odom_ /= static_cast<double>(rotation_velocities.size());
-
-  linear_velocity_odom_ = 0.;
-  for (double new_translation_velocity : translation_velocities)
-    linear_velocity_odom_ += new_translation_velocity;
-  linear_velocity_odom_ /= static_cast<double>(translation_velocities.size());
-}
-
-void VescAckermann::calculateSteering(boost::optional<double> steering_center,
-                                      const boost::optional<Axle::DriveMotorHelper>& drive_motors, double radius,
-                                      double& steering_left, double& steering_right)
-{
-  if (!steering_center || !drive_motors)
+  VehicleVelocity total_velocity(0.0, 0.0);
+  for (const VehicleVelocity& velocity : velocities)
   {
-    steering_left = 0.;
-    steering_right = 0.;
-    return;
+    total_velocity.linear_velocity += velocity.linear_velocity;
+    total_velocity.angular_velocity += velocity.angular_velocity;
   }
+  total_velocity.linear_velocity /= velocities.size();
+  total_velocity.angular_velocity /= velocities.size();
 
-  steering_left = std::atan2(radius - drive_motors->track_width / 2., drive_motors->distance_to_wheel_base);
-  steering_right = std::atan2(radius + drive_motors->track_width / 2., drive_motors->distance_to_wheel_base);
+  velocity_odom_ = total_velocity;
 }
-
-double VescAckermann::calculateRadius(boost::optional<double> steering,
-                                      const boost::optional<Axle::DriveMotorHelper>& drive_motors)
-{
-  if (!steering || !drive_motors)
-    return 0;
-
-  return drive_motors->distance_to_wheel_base / std::tan(steering.get());
 }
-
-void VescAckermann::calculateOffset(double steering_left, double steering_right,
-                                    const boost::optional<Axle::DriveMotorHelper>& drive_motors,
-                                    double& left_x_wheel_offset, double& left_y_wheel_offset,
-                                    double& right_x_wheel_offset, double& right_y_wheel_offset)
-{
-  calculateOffset(steering_left, drive_motors, left_x_wheel_offset, left_y_wheel_offset);
-  calculateOffset(steering_right, drive_motors, right_x_wheel_offset, right_y_wheel_offset);
-}
-
-void VescAckermann::calculateOffset(double steering, const boost::optional<Axle::DriveMotorHelper>& drive_motors,
-                                    double& x_wheel_offset, double& y_wheel_offset)
-{
-  if (!drive_motors)
-  {
-    x_wheel_offset = 0.;
-    y_wheel_offset = 0.;
-    return;
-  }
-
-  x_wheel_offset = std::sin(steering) * drive_motors->wheel_rotation_offset;
-  y_wheel_offset = std::sin(steering) * drive_motors->wheel_rotation_offset;
-}
-
-double VescAckermann::calculateLeftRotationVelocity(double radius,
-                                                    const boost::optional<Axle::DriveMotorHelper>& drive_motors,
-                                                    double left_y_wheel_offset, double left_x_wheel_offset,
-                                                    double velocity)
-{
-  if (!drive_motors)
-    return 0;
-
-  const double y_offset = radius - drive_motors->track_width / 2. + left_y_wheel_offset;
-
-  return calculateRotationVelocity(y_offset, drive_motors, left_x_wheel_offset, velocity);
-}
-
-double VescAckermann::calculateRightRotationVelocity(double radius,
-                                                     const boost::optional<Axle::DriveMotorHelper>& drive_motors,
-                                                     double left_y_wheel_offset, double left_x_wheel_offset,
-                                                     double velocity)
-{
-  if (!drive_motors)
-    return 0;
-
-  const double y_offset = radius + drive_motors->track_width / 2. - left_y_wheel_offset;
-
-  return calculateRotationVelocity(y_offset, drive_motors, left_x_wheel_offset, velocity);
-}
-
-double VescAckermann::calculateRotationVelocity(double y_offset,
-                                                const boost::optional<Axle::DriveMotorHelper>& drive_motors,
-                                                double left_x_wheel_offset, double velocity)
-{
-  if (!drive_motors)
-    return 0;
-
-  const double x_offset = drive_motors->distance_to_wheel_base + left_x_wheel_offset;
-  const double distance = std::hypot(y_offset, x_offset);
-
-  return velocity / distance;
-}
-
-}
-
