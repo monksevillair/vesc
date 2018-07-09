@@ -9,9 +9,12 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 #include <vesc_ackermann/vesc_ackermann.h>
 #include <angles/angles.h>
+#include <Eigen/Core>
+#include <Eigen/QR>
 #include <functional>
 #include <nav_msgs/Odometry.h>
 #include <std_msgs/Float32.h>
+#include <vesc_ackermann/vehicle_velocity.h>
 
 namespace vesc_ackermann
 {
@@ -272,49 +275,24 @@ double VescAckermann::getSupplyVoltage()
 
 void VescAckermann::calcOdomSpeed(const ros::Time& time)
 {
-  std::vector<VehicleVelocity> velocities;
+  // Compute vehicle velocity using pseudo inverse of velocity constraints:
+  VehicleVelocityConstraints constraints;
+  front_axle_->getVelocityConstraints(time, constraints);
+  rear_axle_->getVelocityConstraints(time, constraints);
 
-  if (front_axle_config_.is_driven)
+  Eigen::MatrixXd a(Eigen::MatrixXd::Zero(constraints.size(), 3));
+  Eigen::VectorXd b(Eigen::VectorXd::Zero(constraints.size()));
+  for (size_t i = 0; i < constraints.size(); ++i)
   {
-    const VehicleVelocity front_axle_velocity = *front_axle_->getVelocity(time);
-
-    if (front_axle_config_.is_steered)
-    {
-      velocities.emplace_back(front_axle_velocity);
-    }
-    else if (rear_axle_config_.is_steered)
-    {
-      const double tan_rear_steering_angle = std::tan(rear_axle_->getSteeringAngle(time));
-      velocities.emplace_back(front_axle_velocity.linear_velocity,
-                              front_axle_velocity.linear_velocity * tan_rear_steering_angle / -config_.wheelbase);
-    }
+    a(i, 0) = constraints[i].a_v_x;
+    a(i, 1) = constraints[i].a_v_y;
+    a(i, 2) = constraints[i].a_v_theta;
+    b(i) = constraints[i].b;
   }
 
-  if (rear_axle_config_.is_driven)
-  {
-    const VehicleVelocity rear_axle_velocity = *rear_axle_->getVelocity(time);
-
-    if (rear_axle_config_.is_steered)
-    {
-      velocities.emplace_back(rear_axle_velocity);
-    }
-    else if (front_axle_config_.is_steered)
-    {
-      const double tan_front_steering_angle = std::tan(front_axle_->getSteeringAngle(time));
-      velocities.emplace_back(rear_axle_velocity.linear_velocity,
-                              rear_axle_velocity.linear_velocity * tan_front_steering_angle / config_.wheelbase);
-    }
-  }
-
-  VehicleVelocity total_velocity(0.0, 0.0);
-  for (const VehicleVelocity& velocity : velocities)
-  {
-    total_velocity.linear_velocity += velocity.linear_velocity;
-    total_velocity.angular_velocity += velocity.angular_velocity;
-  }
-  total_velocity.linear_velocity /= velocities.size();
-  total_velocity.angular_velocity /= velocities.size();
-
-  velocity_odom_ = total_velocity;
+  Eigen::Vector3d x = a.fullPivHouseholderQr().solve(b);
+  velocity_odom_.v_x = x(0);
+  velocity_odom_.v_y = x(1);
+  velocity_odom_.v_theta = x(2);
 }
 }

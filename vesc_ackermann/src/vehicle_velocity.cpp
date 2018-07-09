@@ -5,8 +5,13 @@
 
 namespace vesc_ackermann
 {
-VehicleVelocity::VehicleVelocity(double linear_velocity_, double angular_velocity_)
-  : linear_velocity(linear_velocity_), angular_velocity(angular_velocity_)
+VehicleVelocity::VehicleVelocity(double v_x_, double v_y_, double v_theta_)
+  : v_x(v_x_), v_y(v_y_), v_theta(v_theta_)
+{
+}
+
+VehicleVelocityConstraint::VehicleVelocityConstraint(double a_v_x_, double a_v_y_, double a_v_theta_, double b_)
+  : a_v_x(a_v_x_), a_v_y(a_v_y_), a_v_theta(a_v_theta_), b(b_)
 {
 }
 }

@@ -13,8 +13,9 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <dynamic_reconfigure/server.h>
 #include <tf/transform_broadcaster.h>
 #include <vesc_ackermann/AckermannConfig.h>
-#include <vesc_ackermann/AxleConfig.h>
 #include <vesc_ackermann/axle.h>
+#include <vesc_ackermann/AxleConfig.h>
+#include <vesc_ackermann/types.h>
 #include <vesc_motor/vesc_transport_factory.h>
 
 namespace vesc_ackermann
@@ -55,8 +56,8 @@ protected:
 
   std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory_;
 
-  std::shared_ptr<Axle> front_axle_;
-  std::shared_ptr<Axle> rear_axle_;
+  AxlePtr front_axle_;
+  AxlePtr rear_axle_;
 
   bool initialized_ = false;
 

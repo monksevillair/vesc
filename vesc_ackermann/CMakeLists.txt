@@ -19,6 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
+find_package(Eigen3 REQUIRED)
 find_package(OpenCV)
 
 
@@ -75,6 +76,7 @@ add_compile_options(-std=c++11 -Wall -Wextra)
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
 )
 
@@ -83,7 +85,9 @@ add_library(${PROJECT_NAME}
   src/axle.cpp include/vesc_ackermann/axle.h
   src/drive_motor.cpp include/vesc_ackermann/drive_motor.h
   include/vesc_ackermann/optional_data_publisher.h
+  src/steering.cpp include/vesc_ackermann/steering.h
   src/steering_motor.cpp include/vesc_ackermann/steering_motor.h
+  include/vesc_ackermann/types.h
   src/vehicle_velocity.cpp include/vesc_ackermann/vehicle_velocity.h
   src/vesc_ackermann.cpp include/vesc_ackermann/vesc_ackermann.h
   src/wheel.cpp include/vesc_ackermann/wheel.h
@@ -91,6 +95,7 @@ add_library(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
+  ${EIGEN3_LIBRARIES}
   ${OpenCV_LIBRARIES}
 )
 
@@ -168,10 +173,13 @@ target_link_libraries(${PROJECT_NAME}_node
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_vesc_differential_drive.cpp)
-# if(TARGET ${PROJECT_NAME}-test)
-#   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
-# endif()
+catkin_add_gtest(${PROJECT_NAME}-test
+  test/test_wheel.cpp
+)
+
+if(TARGET ${PROJECT_NAME}-test)
+  target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
+endif()
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)

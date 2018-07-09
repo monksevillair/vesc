@@ -7,16 +7,19 @@ All rights reserved.
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <vesc_ackermann/axle.h>
+#include <vesc_ackermann/steering.h>
+#include <vesc_ackermann/vehicle_velocity.h>
 
 namespace vesc_ackermann
 {
 Axle::Axle(const ros::NodeHandle& nh, const AckermannConfig& common_config, const AxleConfig& axle_config,
            std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory, double position_x)
   : common_config_(common_config), axle_config_(axle_config), position_x_(position_x),
+    steering_(std::make_shared<IdealAckermannSteering>(0.0)),
     left_wheel_(position_x, 0.5 * axle_config.track, 0.5 * axle_config.track - axle_config.steering_hinge_offset,
-                0.5 * axle_config.wheel_diameter),
+                0.5 * axle_config.wheel_diameter, steering_),
     right_wheel_(position_x, -0.5 * axle_config.track, -(0.5 * axle_config.track - axle_config.steering_hinge_offset),
-                 0.5 * axle_config.wheel_diameter)
+                 0.5 * axle_config.wheel_diameter, steering_)
 {
   const double execution_duration = 1.0 / (common_config_.odometry_rate * 2.1);
 
@@ -93,54 +96,29 @@ void Axle::setVelocity(const double linear_velocity, const double normalized_ste
   }
 }
 
-double Axle::getSteeringAngle(const ros::Time& time)
+void Axle::getVelocityConstraints(const ros::Time& time, VehicleVelocityConstraints& constraints)
 {
+  double steering_angle = 0.0;
+  double steering_velocity = 0.0;
   if (steering_motor_)
   {
-    return steering_motor_->getPosition(time);
-  }
-  return 0.0;
-}
+    steering_angle = steering_motor_->getPosition(time);
 
-boost::optional<VehicleVelocity> Axle::getVelocity(const ros::Time& time)
-{
-  if (left_motor_ && right_motor_)
-  {
-    const double left_velocity = left_motor_->getVelocity(time);
-    const double right_velocity = right_motor_->getVelocity(time);
-
-    if (steering_motor_)
+    if (!last_steering_angle_time_.isZero() && time > last_steering_angle_time_)
     {
-      const double current_steering_angle = steering_motor_->getPosition(time);
-
-      double current_steering_velocity = 0.0;
-      if (!last_steering_angle_time_.isZero() && time > last_steering_angle_time_)
-      {
-        const double time_difference = (time - last_steering_angle_time_).toSec();
-        current_steering_velocity = (current_steering_angle - last_steering_angle_) / time_difference;
-      }
-
-      VehicleVelocity left_vehicle_velocity
-        = left_wheel_.computeVehicleVelocity(left_velocity, current_steering_angle, current_steering_velocity);
-      VehicleVelocity right_vehicle_velocity
-        = right_wheel_.computeVehicleVelocity(right_velocity, current_steering_angle, current_steering_velocity);
-
-      return VehicleVelocity(
-        0.5 * (left_vehicle_velocity.linear_velocity + right_vehicle_velocity.linear_velocity),
-        0.5 * (left_vehicle_velocity.angular_velocity + right_vehicle_velocity.angular_velocity)
-      );
+      const double time_difference = (time - last_steering_angle_time_).toSec();
+      steering_velocity = (steering_angle - last_steering_angle_) / time_difference;
     }
 
-    // If the axle is not steered, the formula becomes the differential drive formula:
-    const double left_tangential_velocity = left_velocity * axle_config_.wheel_diameter * 0.5;
-    const double right_tangential_velocity = right_velocity * axle_config_.wheel_diameter * 0.5;
-
-    return VehicleVelocity(
-      (left_tangential_velocity + right_tangential_velocity) * 0.5,
-      (right_tangential_velocity - left_tangential_velocity) / axle_config_.track
-    );
+    last_steering_angle_time_ = time;
+    last_steering_angle_ = steering_angle;
   }
-  return boost::none;
+
+  const boost::optional<double> left_velocity = left_motor_ ? left_motor_->getVelocity(time) : boost::none;
+  const boost::optional<double> right_velocity = right_motor_ ? right_motor_->getVelocity(time) : boost::none;
+
+  left_wheel_.computeVehicleVelocityConstraints(left_velocity, steering_angle, steering_velocity, constraints);
+  right_wheel_.computeVehicleVelocityConstraints(right_velocity, steering_angle, steering_velocity, constraints);
 }
 
 boost::optional<double> Axle::getSupplyVoltage()

@@ -17,7 +17,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <vesc_ackermann/AxleConfig.h>
 #include <vesc_ackermann/drive_motor.h>
 #include <vesc_ackermann/steering_motor.h>
-#include <vesc_ackermann/vehicle_velocity.h>
+#include <vesc_ackermann/types.h>
 #include <vesc_ackermann/wheel.h>
 
 namespace vesc_ackermann
@@ -30,8 +30,7 @@ public:
 
   void setVelocity(double linear_velocity, double normalized_steering_angle, const ros::Time& time);
 
-  double getSteeringAngle(const ros::Time& time);
-  boost::optional<VehicleVelocity> getVelocity(const ros::Time& time);
+  void getVelocityConstraints(const ros::Time& time, VehicleVelocityConstraints& constraints);
 
   boost::optional<double> getSupplyVoltage();
 
@@ -40,6 +39,7 @@ protected:
   AxleConfig axle_config_;
   double position_x_;
 
+  SteeringConstPtr steering_;
   Wheel left_wheel_;
   Wheel right_wheel_;
 

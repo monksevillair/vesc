@@ -4,12 +4,13 @@
 #ifndef VESC_ACKERMANN_WHEEL_H
 #define VESC_ACKERMANN_WHEEL_H
 
-#include <vesc_ackermann/vehicle_velocity.h>
+#include <boost/optional.hpp>
+#include <vesc_ackermann/types.h>
 
 namespace vesc_ackermann
 {
 /**
- * Representation of a wheel and its steering hinge.
+ * Representation of a wheel's and its steering hinge's geometry.
  *
  * The positions' coordinate frame origin (0, 0) is the (hypothetical) instant center of rotation when the vehicle is
  * rotating in place. The coordinate frame is furthermore aligned so that the instant center of rotation is always on
@@ -18,7 +19,7 @@ namespace vesc_ackermann
 class Wheel
 {
 public:
-  Wheel(double position_x, double position_y, double hinge_position_y, double radius);
+  Wheel(double position_x, double position_y, double hinge_position_y, double radius, const SteeringConstPtr& steering);
 
   /**
    * Computes the angular velocity (in rad/s) of the wheel given the intended movement of the vehicle.
@@ -35,25 +36,15 @@ public:
   double computeWheelVelocity(double linear_velocity, double angular_velocity, double steering_angle,
                               double steering_velocity) const;
 
-  VehicleVelocity computeVehicleVelocity(double wheel_velocity, double steering_angle, double steering_velocity) const;
-
-protected:
-  /**
-   * Computes the steering angle of the wheel from the steering angle of the hypothetical central wheel, assuming ideal
-   * Ackermann geometry.
-   *
-   * @param steering_angle the steering angle of the hypothetical central wheel.
-   * @return the steering angle of the wheel.
-   */
-  double computeWheelSteeringAngle(double steering_angle) const;
-  double computeWheelSteeringVelocity(double steering_angle, double steering_velocity) const;
-
-  static constexpr double SIMULATION_TIME = 0.01;
+  void computeVehicleVelocityConstraints(
+    boost::optional<double> wheel_velocity, double steering_angle, double steering_velocity,
+    VehicleVelocityConstraints& constraints) const;
 
   double position_x_ = 0.0;
   double position_y_ = 0.0;
   double hinge_position_y_ = 0.0;
   double radius_ = 0.0;
+  SteeringConstPtr steering_;
 };
 }
 
