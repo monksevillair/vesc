@@ -7,21 +7,17 @@ project(vesc_ackermann)
 find_package(catkin REQUIRED COMPONENTS
   ackermann_msgs
   angles
-  cv_bridge
   dynamic_reconfigure
   geometry_msgs
   nav_msgs
   roscpp
   tf
-  vesc_driver
   vesc_motor
 )
 
 ## System dependencies are found with CMake's conventions
-# find_package(Boost REQUIRED COMPONENTS system)
+find_package(Boost REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(OpenCV)
-
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -75,9 +71,9 @@ add_compile_options(-std=c++11 -Wall -Wextra)
 ## Your package locations should be listed before other locations
 include_directories(
   include
+  ${Boost_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
-  ${OpenCV_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -91,12 +87,11 @@ add_library(${PROJECT_NAME}
   src/vehicle_velocity.cpp include/vesc_ackermann/vehicle_velocity.h
   src/vesc_ackermann.cpp include/vesc_ackermann/vesc_ackermann.h
   src/wheel.cpp include/vesc_ackermann/wheel.h
-)
+  src/motor_factory.cpp include/vesc_ackermann/motor_factory.h)
 
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
   ${EIGEN3_LIBRARIES}
-  ${OpenCV_LIBRARIES}
 )
 
 ## Add cmake target dependencies of the library

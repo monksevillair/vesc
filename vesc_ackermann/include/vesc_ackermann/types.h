@@ -13,6 +13,10 @@ class Axle;
 
 typedef std::shared_ptr<Axle> AxlePtr;
 
+class MotorFactory;
+
+typedef std::shared_ptr<MotorFactory> MotorFactoryPtr;
+
 class Steering;
 
 typedef std::shared_ptr<Steering const> SteeringConstPtr;

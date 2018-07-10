@@ -13,6 +13,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <boost/optional.hpp>
 #include <memory>
 #include <ros/node_handle.h>
+#include <ros/time.h>
 #include <vesc_ackermann/AckermannConfig.h>
 #include <vesc_ackermann/AxleConfig.h>
 #include <vesc_ackermann/drive_motor.h>
@@ -26,7 +27,7 @@ class Axle
 {
 public:
   Axle(const ros::NodeHandle& nh, const AckermannConfig& common_config, const AxleConfig& axle_config,
-       std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory, double position_x);
+       const MotorFactoryPtr& motor_factory, double position_x);
 
   void setVelocity(double linear_velocity, double normalized_steering_angle, const ros::Time& time);
 

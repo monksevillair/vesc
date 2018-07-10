@@ -16,6 +16,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <vesc_ackermann/axle.h>
 #include <vesc_ackermann/AxleConfig.h>
 #include <vesc_ackermann/types.h>
+#include <vesc_ackermann/vehicle_velocity.h>
 #include <vesc_motor/vesc_transport_factory.h>
 
 namespace vesc_ackermann
@@ -28,7 +29,7 @@ public:
 protected:
   void commandVelocityCB(const ackermann_msgs::AckermannDriveConstPtr& cmd_vel);
   void calcOdomSpeed(const ros::Time& time);
-  double getSupplyVoltage();
+  void publishSupplyVoltage();
 
   void reconfigure(AckermannConfig& config, uint32_t level);
   void reconfigureFrontAxle(AxleConfig& config, uint32_t level);
@@ -38,9 +39,6 @@ protected:
   void odomTimerCB(const ros::TimerEvent& event);
   void updateOdometry(const ros::Time& time);
   void publishOdom();
-  double ensureBounds(double value, double max);
-  double ensureBounds(double value, double min, double max);
-  void publishDoubleValue(const double& value, ros::Publisher& publisher);
 
   ros::NodeHandle private_nh_;
   ros::NodeHandle front_axle_private_nh_;
@@ -54,7 +52,7 @@ protected:
   dynamic_reconfigure::Server<AxleConfig> front_axle_reconfigure_server_;
   dynamic_reconfigure::Server<AxleConfig> rear_axle_reconfigure_server_;
 
-  std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory_;
+  MotorFactoryPtr motor_factory_;
 
   AxlePtr front_axle_;
   AxlePtr rear_axle_;

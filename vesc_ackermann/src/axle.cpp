@@ -13,7 +13,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 namespace vesc_ackermann
 {
 Axle::Axle(const ros::NodeHandle& nh, const AckermannConfig& common_config, const AxleConfig& axle_config,
-           std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory, double position_x)
+           const MotorFactoryPtr& motor_factory, double position_x)
   : common_config_(common_config), axle_config_(axle_config), position_x_(position_x),
     steering_(std::make_shared<IdealAckermannSteering>(0.0)),
     left_wheel_(position_x, 0.5 * axle_config.track, 0.5 * axle_config.track - axle_config.steering_hinge_offset,
@@ -21,22 +21,22 @@ Axle::Axle(const ros::NodeHandle& nh, const AckermannConfig& common_config, cons
     right_wheel_(position_x, -0.5 * axle_config.track, -(0.5 * axle_config.track - axle_config.steering_hinge_offset),
                  0.5 * axle_config.wheel_diameter, steering_)
 {
-  const double execution_duration = 1.0 / (common_config_.odometry_rate * 2.1);
+  const double motor_control_interval = 1.0 / (common_config_.odometry_rate * 2.1);
 
   if (axle_config_.is_steered)
   {
     ros::NodeHandle steering_motor_nh(nh, "steering_motor");
-    steering_motor_.emplace(steering_motor_nh, transport_factory, execution_duration,
+    steering_motor_.emplace(motor_factory, steering_motor_nh, motor_control_interval,
                             common_config_.publish_motor_speed);
   }
 
   if (axle_config_.is_driven)
   {
     ros::NodeHandle left_motor_nh(nh, "left_motor");
-    left_motor_.emplace(left_motor_nh, transport_factory, execution_duration, common_config_.publish_motor_speed);
+    left_motor_.emplace(motor_factory, left_motor_nh, motor_control_interval, common_config_.publish_motor_speed);
 
     ros::NodeHandle right_motor_nh(nh, "right_motor");
-    right_motor_.emplace(right_motor_nh, transport_factory, execution_duration, common_config_.publish_motor_speed);
+    right_motor_.emplace(motor_factory, right_motor_nh, motor_control_interval, common_config_.publish_motor_speed);
   }
 }
 
@@ -114,8 +114,17 @@ void Axle::getVelocityConstraints(const ros::Time& time, VehicleVelocityConstrai
     last_steering_angle_ = steering_angle;
   }
 
-  const boost::optional<double> left_velocity = left_motor_ ? left_motor_->getVelocity(time) : boost::none;
-  const boost::optional<double> right_velocity = right_motor_ ? right_motor_->getVelocity(time) : boost::none;
+  boost::optional<double> left_velocity;
+  if (left_motor_)
+  {
+    left_velocity = left_motor_->getVelocity(time);
+  }
+
+  boost::optional<double> right_velocity;
+  if (right_motor_)
+  {
+    right_velocity = right_motor_->getVelocity(time);
+  }
 
   left_wheel_.computeVehicleVelocityConstraints(left_velocity, steering_angle, steering_velocity, constraints);
   right_wheel_.computeVehicleVelocityConstraints(right_velocity, steering_angle, steering_velocity, constraints);

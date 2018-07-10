@@ -14,7 +14,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <functional>
 #include <nav_msgs/Odometry.h>
 #include <std_msgs/Float32.h>
-#include <vesc_ackermann/vehicle_velocity.h>
+#include <vesc_ackermann/motor_factory.h>
 
 namespace vesc_ackermann
 {
@@ -22,7 +22,7 @@ VescAckermann::VescAckermann(const ros::NodeHandle& private_nh)
   : private_nh_(private_nh), front_axle_private_nh_(private_nh_, "front_axle"),
     rear_axle_private_nh_(private_nh_, "rear_axle"), reconfigure_server_(private_nh_),
     front_axle_reconfigure_server_(front_axle_private_nh_), rear_axle_reconfigure_server_(rear_axle_private_nh_),
-    transport_factory_(std::make_shared<vesc_motor::VescTransportFactory>(private_nh_)), velocity_odom_(0.0, 0.0)
+    motor_factory_(std::make_shared<MotorFactory>(private_nh_)), velocity_odom_(0.0, 0.0, 0.0)
 {
   ROS_DEBUG_STREAM("VescAckermann::VescAckermann::4");
 
@@ -115,7 +115,7 @@ void VescAckermann::reinitialize()
       position_x = config_.wheelbase;
     }
 
-    front_axle_ = std::make_shared<Axle>(front_axle_private_nh_, config_, front_axle_config_, transport_factory_,
+    front_axle_ = std::make_shared<Axle>(front_axle_private_nh_, config_, front_axle_config_, motor_factory_,
                                          position_x);
   }
 
@@ -131,7 +131,7 @@ void VescAckermann::reinitialize()
       position_x = -config_.wheelbase;
     }
 
-    rear_axle_ = std::make_shared<Axle>(rear_axle_private_nh_, config_, rear_axle_config_, transport_factory_,
+    rear_axle_ = std::make_shared<Axle>(rear_axle_private_nh_, config_, rear_axle_config_, motor_factory_,
                                         position_x);
   }
 
@@ -159,8 +159,9 @@ void VescAckermann::odomTimerCB(const ros::TimerEvent& event)
   {
     updateOdometry(event.current_real);
     ROS_DEBUG_STREAM("VescAckermann::odomTimerCB::5");
+    publishOdom();
 
-    publishDoubleValue(getSupplyVoltage(), battery_voltage_pub_);
+    publishSupplyVoltage();
     ROS_DEBUG_STREAM("VescAckermann::odomTimerCB::6");
   }
 }
@@ -179,14 +180,15 @@ void VescAckermann::updateOdometry(const ros::Time& time)
       return;
     }
 
-    x_odom_ += velocity_odom_.linear_velocity * std::cos(yaw_odom_) * time_difference;
-    y_odom_ += velocity_odom_.linear_velocity * std::sin(yaw_odom_) * time_difference;
-    yaw_odom_ = angles::normalize_angle(yaw_odom_ + velocity_odom_.angular_velocity * time_difference);
+    const double sin_yaw = std::sin(yaw_odom_);
+    const double cos_yaw = std::cos(yaw_odom_);
+
+    x_odom_ += (velocity_odom_.v_x * cos_yaw - velocity_odom_.v_y * sin_yaw) * time_difference;
+    y_odom_ += (velocity_odom_.v_x * sin_yaw + velocity_odom_.v_y * cos_yaw) * time_difference;
+    yaw_odom_ = angles::normalize_angle(yaw_odom_ + velocity_odom_.v_theta * time_difference);
   }
 
   odom_update_time_ = time;
-
-  publishOdom();
 }
 
 void VescAckermann::publishOdom()
@@ -202,8 +204,9 @@ void VescAckermann::publishOdom()
 
     tf::poseTFToMsg(odom_pose, odom_msg.pose.pose);
 
-    odom_msg.twist.twist.linear.x = velocity_odom_.linear_velocity;
-    odom_msg.twist.twist.angular.z = velocity_odom_.angular_velocity;
+    odom_msg.twist.twist.linear.x = velocity_odom_.v_x;
+    odom_msg.twist.twist.linear.y = velocity_odom_.v_y;
+    odom_msg.twist.twist.angular.z = velocity_odom_.v_theta;
 
     odom_pub_.publish(odom_msg);
   }
@@ -213,23 +216,6 @@ void VescAckermann::publishOdom()
     const tf::StampedTransform transform(odom_pose, odom_update_time_, config_.odom_frame, config_.base_frame);
     tf_broadcaster_.sendTransform(transform);
   }
-}
-
-double VescAckermann::ensureBounds(double value, double max)
-{
-  return ensureBounds(value, -max, max);
-}
-
-double VescAckermann::ensureBounds(double value, double min, double max)
-{
-  return std::min(std::max(value, min), max);
-}
-
-void VescAckermann::publishDoubleValue(const double& value, ros::Publisher& publisher)
-{
-  std_msgs::Float32 msg;
-  msg.data = static_cast<std_msgs::Float32::_data_type>(value);
-  publisher.publish(msg);
 }
 
 void VescAckermann::commandVelocityCB(const ackermann_msgs::AckermannDriveConstPtr& cmd_vel)
@@ -247,7 +233,7 @@ void VescAckermann::commandVelocityCB(const ackermann_msgs::AckermannDriveConstP
   }
 }
 
-double VescAckermann::getSupplyVoltage()
+void VescAckermann::publishSupplyVoltage()
 {
   double supply_voltage = 0.0;
   int num_measurements = 0;
@@ -268,9 +254,10 @@ double VescAckermann::getSupplyVoltage()
 
   if (num_measurements != 0)
   {
-    return supply_voltage / num_measurements;
+    std_msgs::Float32 msg;
+    msg.data = static_cast<std_msgs::Float32::_data_type>(supply_voltage / num_measurements);
+    battery_voltage_pub_.publish(msg);
   }
-  return std::numeric_limits<double>::quiet_NaN();
 }
 
 void VescAckermann::calcOdomSpeed(const ros::Time& time)
