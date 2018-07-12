@@ -33,6 +33,8 @@ protected:
   boost::shared_ptr<vesc_driver::VescDriverInterface> driver_;
 
 private:
+  void callProcessMotorControllerState(const vesc_driver::MotorControllerState& state);
+
   ros::NodeHandle private_nh_;
   std::shared_ptr<VescTransportFactory> transport_factory_;
   std::chrono::duration<double> execution_duration_;

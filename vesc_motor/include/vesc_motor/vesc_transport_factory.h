@@ -21,14 +21,14 @@ namespace vesc_motor
 class VescTransportFactory
 {
 public:
-  VescTransportFactory(const ros::NodeHandle& nh, const std::string& parameter_name = "transport_mapping");
+  explicit VescTransportFactory(const ros::NodeHandle& nh, const std::string& parameter_name = "transport_mapping");
 
   /**
    * Returns a transport by name.
    *
-   * @throw std::out_of_range if no transport with the given name exists.
+   * @throw std::invalid_argument if no transport with the given name exists.
    */
-  std::shared_ptr<vesc_driver::Transport> getTransport(const std::string& transport_name);
+  std::shared_ptr<vesc_driver::Transport> getTransport(const std::string& name);
 
   /**
    * Creates a transport that connects to a VESC via serial port.
@@ -41,10 +41,14 @@ public:
   std::shared_ptr<vesc_driver::Transport> createSerialTransport(uint8_t controller_id, const std::string& port);
 
 protected:
+  typedef std::map<std::string, std::shared_ptr<vesc_driver::Transport>> TransportMap;
+
   template<typename T>
   static T getRequiredParameter(XmlRpc::XmlRpcValue& transport_mapping, const std::string& parameter_name);
 
-  std::map<std::string, std::shared_ptr<vesc_driver::Transport>> transport_map_;
+  ros::NodeHandle nh_;
+  std::string parameter_name_;
+  TransportMap transport_map_;
 };
 }
 

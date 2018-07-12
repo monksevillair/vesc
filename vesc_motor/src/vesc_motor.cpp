@@ -11,7 +11,7 @@ namespace vesc_motor
 VescMotor::VescMotor(const ros::NodeHandle& private_nh, std::shared_ptr<VescTransportFactory> transport_factory,
                      double execution_duration)
   : private_nh_(private_nh), transport_factory_(transport_factory), execution_duration_(execution_duration),
-    state_handler_function_(std::bind(&VescMotor::processMotorControllerState, this, std::placeholders::_1)),
+    state_handler_function_(std::bind(&VescMotor::callProcessMotorControllerState, this, std::placeholders::_1)),
     supply_voltage_(std::numeric_limits<double>::quiet_NaN())
 {
 }
@@ -84,5 +84,11 @@ void VescMotor::updateDriver(bool use_mockup)
 void VescMotor::processMotorControllerState(const vesc_driver::MotorControllerState& state)
 {
   supply_voltage_ = state.voltage_input;
+}
+
+void VescMotor::callProcessMotorControllerState(const vesc_driver::MotorControllerState& state)
+{
+  // This indirection must be done because boost::bind in the constructor doesn't work right with virtual functions.
+  processMotorControllerState(state);
 }
 }

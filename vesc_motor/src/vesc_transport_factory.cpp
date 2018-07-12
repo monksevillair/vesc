@@ -13,25 +13,38 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 namespace vesc_motor
 {
 VescTransportFactory::VescTransportFactory(const ros::NodeHandle& nh, const std::string& parameter_name)
+  : nh_(nh), parameter_name_(parameter_name)
 {
-  ROS_DEBUG_STREAM("VescTransportFactory::VescTransportFactory::1");
+}
 
-  if (nh.hasParam(parameter_name))
+std::shared_ptr<vesc_driver::Transport> VescTransportFactory::getTransport(const std::string& name)
+{
+  const TransportMap::const_iterator transport_it = transport_map_.find(name);
+  if (transport_it != transport_map_.end())
   {
-    ROS_DEBUG_STREAM("VescTransportFactory::VescTransportFactory::2");
+    return transport_it->second;
+  }
+
+  // If transport is not in map yet, try to create it from parameters:
+
+  ROS_DEBUG_STREAM("VescTransportFactory::getTransport::1");
+
+  if (nh_.hasParam(parameter_name_))
+  {
+    ROS_DEBUG_STREAM("VescTransportFactory::getTransport::2");
 
     XmlRpc::XmlRpcValue transport_mappings;
-    nh.getParam(parameter_name, transport_mappings);
+    nh_.getParam(parameter_name_, transport_mappings);
 
     if (transport_mappings.getType() != XmlRpc::XmlRpcValue::TypeArray)
     {
-      throw std::invalid_argument(parameter_name + " parameter has wrong type");
+      throw std::invalid_argument(parameter_name_ + " parameter has wrong type");
     }
 
-    ROS_DEBUG_STREAM("VescTransportFactory::VescTransportFactory::3");
+    ROS_DEBUG_STREAM("VescTransportFactory::getTransport::3");
     for (size_t i = 0; i < transport_mappings.size(); ++i)
     {
-      ROS_DEBUG_STREAM("VescTransportFactory::VescTransportFactory::4");
+      ROS_DEBUG_STREAM("VescTransportFactory::getTransport::4");
 
       XmlRpc::XmlRpcValue& transport_mapping = transport_mappings[i];
 
@@ -41,31 +54,32 @@ VescTransportFactory::VescTransportFactory(const ros::NodeHandle& nh, const std:
       }
 
       const auto transport_name = getRequiredParameter<std::string>(transport_mapping, "transport_name");
-      const auto controller_id = getRequiredParameter<int>(transport_mapping, "controller_id");
-      const auto port = getRequiredParameter<std::string>(transport_mapping, "port");
-
-      if (!(std::numeric_limits<uint8_t>::min() <= controller_id
-        && controller_id <= std::numeric_limits<uint8_t>::max()))
+      if (transport_name == name)
       {
-        throw std::invalid_argument("transport mapping controller id is outside valid range");
+        const auto controller_id = getRequiredParameter<int>(transport_mapping, "controller_id");
+        const auto port = getRequiredParameter<std::string>(transport_mapping, "port");
+
+        if (!(std::numeric_limits<uint8_t>::min() <= controller_id
+          && controller_id <= std::numeric_limits<uint8_t>::max()))
+        {
+          throw std::invalid_argument("transport mapping controller id is outside valid range");
+        }
+
+        ROS_DEBUG_STREAM("VescTransportFactory::getTransport::5");
+
+        const auto serial_transport = createSerialTransport(static_cast<uint8_t>(controller_id), port);
+
+        ROS_DEBUG_STREAM("VescTransportFactory::getTransport::7");
+
+        transport_map_[transport_name] = serial_transport;
+
+        ROS_DEBUG_STREAM("VescTransportFactory::getTransport::8 transport_name: '" << transport_name << "'");
+
+        return serial_transport;
       }
-
-      ROS_DEBUG_STREAM("VescTransportFactory::VescTransportFactory::5");
-
-      const auto serial_transport = createSerialTransport(static_cast<uint8_t>(controller_id), port);
-
-      ROS_DEBUG_STREAM("VescTransportFactory::VescTransportFactory::7");
-
-      transport_map_[transport_name] = serial_transport;
-
-      ROS_DEBUG_STREAM("VescTransportFactory::VescTransportFactory::8 transport_name: '" << transport_name << "'");
     }
   }
-}
-
-std::shared_ptr<vesc_driver::Transport> VescTransportFactory::getTransport(const std::string& transport_name)
-{
-  return transport_map_.at(transport_name);
+  throw std::invalid_argument("no transport mapping named '" + name + "'");
 }
 
 std::shared_ptr<vesc_driver::Transport> VescTransportFactory::createSerialTransport(uint8_t controller_id,

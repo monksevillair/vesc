@@ -108,16 +108,14 @@ void VescDriveMotor::reconfigure(DriveMotorConfig& config, uint32_t /*level*/)
 
 void VescDriveMotor::processMotorControllerState(const vesc_driver::MotorControllerState& state)
 {
-  ROS_DEBUG_STREAM("VescDriveMotor::stateCB::1");
-
   std::unique_lock<std::mutex> state_lock(state_mutex_);
 
-  ROS_DEBUG_STREAM("VescDriveMotor::stateCB::2");
+  ROS_DEBUG_STREAM("VescDriveMotor::processMotorControllerState: speed: " << state.speed);
 
   ros::Time now = ros::Time::now();
   if (predict(now)) // only correct if prediction can be performed
   {
-    ROS_DEBUG_STREAM("VescDriveMotor::stateCB::3");
+    ROS_DEBUG_STREAM("VescDriveMotor::processMotorControllerState::3");
 
     correct(state.speed / getVelocityConversionFactor());
   }
@@ -126,10 +124,11 @@ void VescDriveMotor::processMotorControllerState(const vesc_driver::MotorControl
     ROS_WARN("Skipping state correction due to failed prediction");
   }
 
-  ROS_DEBUG_STREAM("VescDriveMotor::stateCB::4 state.voltage_input: " << state.voltage_input);
-
   // Call super class implementation:
   VescMotor::processMotorControllerState(state);
+
+  ROS_DEBUG_STREAM("VescDriveMotor::processMotorControllerState: corrected velocity: "
+                     << speed_kf_.statePost.at<float>(0));
 }
 
 double VescDriveMotor::getVelocityConversionFactor() const
