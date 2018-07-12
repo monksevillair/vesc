@@ -12,6 +12,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 #include <chrono>
 #include <condition_variable>
+#include <functional>
 #include <mutex>
 #include <thread>
 
@@ -20,15 +21,13 @@ namespace vesc_driver
 class PeriodicTask
 {
 public:
-  explicit PeriodicTask(const std::chrono::duration<double>& period);
-  virtual ~PeriodicTask();
+  PeriodicTask(const std::function<void()>& task, const std::chrono::duration<double>& period);
+  ~PeriodicTask();
 
-  virtual void stop();
+  void start();
+  void stop();
 
 protected:
-  virtual void execute() = 0;
-
-private:
   typedef std::chrono::system_clock Clock;
 
   bool isRunning(const Clock::time_point& end_of_period);
@@ -36,8 +35,9 @@ private:
 
   std::mutex run_mutex_;
   std::condition_variable run_condition_;
-  bool running_ = true;
+  bool running_ = false;
 
+  std::function<void()> task_;
   Clock::duration period_;
   std::thread execution_thread_;
 };

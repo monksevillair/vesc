@@ -8,14 +8,16 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
  */
 
 #include <vesc_driver/vesc_driver_mockup.h>
+#include <functional>
 
 namespace vesc_driver
 {
 VescDriverMockup::VescDriverMockup(const std::chrono::duration<double>& sleep_duration,
                                    const VescDriverInterface::StateHandlerFunction& state_handler_function)
-  :
-  VescDriverInterface(state_handler_function), PeriodicTask(sleep_duration)
-{}
+  : VescDriverInterface(state_handler_function), task_(std::bind(&VescDriverMockup::execute, this), sleep_duration)
+{
+  task_.start();
+}
 
 void VescDriverMockup::setDutyCycle(double duty_cycle)
 {

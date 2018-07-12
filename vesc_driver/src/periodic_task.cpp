@@ -6,19 +6,27 @@ All rights reserved.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 #include <vesc_driver/periodic_task.h>
 
 namespace vesc_driver
 {
-PeriodicTask::PeriodicTask(const std::chrono::duration<double>& period)
-  : period_(std::chrono::duration_cast<Clock::duration>(period)),
-    execution_thread_(&PeriodicTask::executionLoop, this)
+PeriodicTask::PeriodicTask(const std::function<void()>& task, const std::chrono::duration<double>& period)
+  : task_(task), period_(std::chrono::duration_cast<Clock::duration>(period))
 {}
 
 PeriodicTask::~PeriodicTask()
 {
   stop();
+}
+
+void PeriodicTask::start()
+{
+  if (!execution_thread_.joinable())
+  {
+    std::lock_guard<std::mutex> run_lock(run_mutex_);
+    running_ = true;
+    execution_thread_ = std::thread(&PeriodicTask::executionLoop, this);
+  }
 }
 
 void PeriodicTask::stop()
@@ -46,7 +54,7 @@ void PeriodicTask::executionLoop()
 {
   for (Clock::time_point end_of_period = Clock::now(); isRunning(end_of_period); end_of_period += period_)
   {
-    execute();
+    task_();
   }
 }
 }

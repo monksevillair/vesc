@@ -17,7 +17,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_driver
 {
-class VescDriverImpl : public VescDriverInterface, public PeriodicTask
+class VescDriverImpl : public VescDriverInterface
 {
 public:
   VescDriverImpl(const std::chrono::duration<double>& sleep_duration,
@@ -47,12 +47,13 @@ protected:
     VescDriverImpl* driver_;
   };
 
-  void execute() override;
+  void execute();
 
   void processResponsePacket(const ResponsePacket& packet);
   void processFirmwareVersionPacket(const FirmwareVersion& firmware_version);
   void processMotorControllerStatePacket(const MotorControllerState& state);
 
+  PeriodicTask task_;
   std::shared_ptr<Transport> transport_;
 
   std::atomic<bool> initialized_{false};

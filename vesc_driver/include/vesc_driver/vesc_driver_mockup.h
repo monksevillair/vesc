@@ -16,7 +16,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_driver
 {
-class VescDriverMockup : public VescDriverInterface, public PeriodicTask
+class VescDriverMockup : public VescDriverInterface
 {
 public:
   VescDriverMockup(const std::chrono::duration<double>& sleep_duration,
@@ -35,9 +35,9 @@ public:
   FirmwareVersion getFirmwareVersion() override;
 
 protected:
-  void execute() override;
+  void execute();
 
-private:
+  PeriodicTask task_;
   std::mutex current_state_mutex_;
   MotorControllerState current_state_;
 };
