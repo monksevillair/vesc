@@ -9,6 +9,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #ifndef VESC_ACKERMANN_STEERING_MOTOR_H
 #define VESC_ACKERMANN_STEERING_MOTOR_H
 
+#include <ros/node_handle.h>
 #include <ros/time.h>
 #include <std_msgs/Float64.h>
 #include <vesc_ackermann/optional_data_publisher.h>

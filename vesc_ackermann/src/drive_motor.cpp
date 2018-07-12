@@ -18,10 +18,33 @@ DriveMotor::DriveMotor(const MotorFactoryPtr& motor_factory, ros::NodeHandle& pr
 {
 }
 
+double DriveMotor::getPosition(const ros::Time& time)
+{
+  if (time > last_velocity_time_)
+  {
+    getVelocity(time);
+  }
+
+  return last_position_;
+}
+
 double DriveMotor::getVelocity(const ros::Time& time)
 {
   const double velocity = motor_->getVelocity(time);
   velocity_received_publisher.publish(velocity);
+
+  if (time > last_velocity_time_)
+  {
+    if (!last_velocity_time_.isZero())
+    {
+      const double time_difference = (time - last_velocity_time_).toSec();
+      last_position_ += (last_velocity_ + velocity) * 0.5 * time_difference;  // Assumes constant acceleration
+    }
+
+    last_velocity_ = velocity;
+    last_velocity_time_ = time;
+  }
+
   return velocity;
 }
 

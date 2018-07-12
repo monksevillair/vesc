@@ -76,7 +76,7 @@ void Vehicle::setVelocity(const geometry_msgs::Twist& velocity)
   const ros::Time now = ros::Time::now();
   for (Axle* const axle : axles_)
   {
-    axle->setVelocity(velocity.linear.x, steering_angle, wheelbase_, now);
+    axle->setVelocity(linear_velocity, steering_angle, wheelbase_, now);
   }
 }
 
@@ -111,6 +111,7 @@ geometry_msgs::Twist Vehicle::getVelocity(const ros::Time& time)
 sensor_msgs::JointState Vehicle::getJointStates(const ros::Time& time)
 {
   sensor_msgs::JointState joint_states;
+  joint_states.header.stamp = time;
   for (Axle* const axle : axles_)
   {
     axle->getJointStates(time, joint_states);

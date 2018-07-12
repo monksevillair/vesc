@@ -74,6 +74,15 @@ void VescAckermann::reconfigure(AckermannConfig& config, uint32_t /*level*/)
     odom_pub_.shutdown();
   }
 
+  if (!tf_broadcaster_ && config_.publish_tf)
+  {
+    tf_broadcaster_.emplace();
+  }
+  else if (tf_broadcaster_ && !config_.publish_tf)
+  {
+    tf_broadcaster_.reset();
+  }
+
   if (!supply_voltage_pub_ && config_.publish_supply_voltage)
   {
     supply_voltage_pub_ = private_nh_.advertise<std_msgs::Float32>("supply_voltage", 1);

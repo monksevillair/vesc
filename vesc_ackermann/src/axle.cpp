@@ -65,14 +65,12 @@ void Axle::reconfigure(AxleConfig& axle_config, uint32_t /*level*/)
 
   left_wheel_.position_x_ = axle_config_->position_x;
   left_wheel_.position_y_ = axle_config_->position_y + 0.5 * axle_config_->track;
-  left_wheel_.hinge_position_y_ = axle_config_->position_y + 0.5 * axle_config_->track
-    - axle_config_->steering_hinge_offset;
+  left_wheel_.hinge_position_y_ = left_wheel_.position_y_ - axle_config_->steering_hinge_offset;
   left_wheel_.radius_ = 0.5 * axle_config_->wheel_diameter;
 
   right_wheel_.position_x_ = axle_config_->position_x;
   right_wheel_.position_y_ = axle_config_->position_y - 0.5 * axle_config_->track;
-  right_wheel_.hinge_position_y_ = axle_config_->position_y - 0.5 * axle_config_->track
-    + axle_config_->steering_hinge_offset;
+  right_wheel_.hinge_position_y_ = right_wheel_.position_y_ + axle_config_->steering_hinge_offset;
   right_wheel_.radius_ = 0.5 * axle_config_->wheel_diameter;
 }
 
@@ -183,6 +181,33 @@ void Axle::getJointStates(const ros::Time& time, sensor_msgs::JointState& joint_
       joint_states.name.push_back(axle_config_->left_wheel_joint);
       joint_states.position.push_back(left_motor_->getPosition(time));
       joint_states.velocity.push_back(left_motor_->getVelocity(time));
+    }
+
+    if (right_motor_ && !axle_config_->right_wheel_joint.empty())
+    {
+      joint_states.name.push_back(axle_config_->right_wheel_joint);
+      joint_states.position.push_back(right_motor_->getPosition(time));
+      joint_states.velocity.push_back(right_motor_->getVelocity(time));
+    }
+
+    if (steering_motor_ && (!axle_config_->left_hinge_joint.empty() || !axle_config_->right_hinge_joint.empty()))
+    {
+      const double position = steering_motor_->getPosition(time);
+      const double velocity = steering_motor_->getVelocity(time);
+
+      if (!axle_config_->left_hinge_joint.empty())
+      {
+        joint_states.name.push_back(axle_config_->left_hinge_joint);
+        joint_states.position.push_back(steering_->computeWheelSteeringAngle(left_wheel_, position));
+        joint_states.velocity.push_back(steering_->computeWheelSteeringVelocity(left_wheel_, position, velocity));
+      }
+
+      if (!axle_config_->right_hinge_joint.empty())
+      {
+        joint_states.name.push_back(axle_config_->right_hinge_joint);
+        joint_states.position.push_back(steering_->computeWheelSteeringAngle(right_wheel_, position));
+        joint_states.velocity.push_back(steering_->computeWheelSteeringVelocity(right_wheel_, position, velocity));
+      }
     }
   }
 }
