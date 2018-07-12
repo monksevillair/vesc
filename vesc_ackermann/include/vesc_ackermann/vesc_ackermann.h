@@ -30,15 +30,13 @@ public:
 
 protected:
   void reconfigure(AckermannConfig& config, uint32_t level);
-  void reinitialize();
 
   void processVelocityCommand(const geometry_msgs::TwistConstPtr& cmd_vel);
   void processAckermannCommand(const ackermann_msgs::AckermannDriveConstPtr& cmd_vel);
 
   void odomTimerCB(const ros::TimerEvent& event);
   void updateOdometry(const ros::Time& time);
-  void calcOdomSpeed(const ros::Time& time);
-  void publishOdom();
+  void publishOdometry();
 
   void publishSupplyVoltage();
 
@@ -47,8 +45,6 @@ protected:
   AckermannConfig config_;
 
   dynamic_reconfigure::Server<AckermannConfig> reconfigure_server_;
-
-  bool initialized_ = false;
 
   boost::optional<Vehicle> vehicle_;
 

@@ -16,64 +16,69 @@ Axle::Axle(const ros::NodeHandle& nh, const AckermannConfig& common_config, cons
   : nh_(nh), motor_factory_(motor_factory), common_config_(common_config), axle_config_server_(nh),
     steering_(std::make_shared<IdealAckermannSteering>(0.0))
 {
+  left_wheel_.steering_ = steering_;
+  right_wheel_.steering_ = steering_;
   axle_config_server_.setCallback(std::bind(&Axle::reconfigure, this, std::placeholders::_1, std::placeholders::_2));
 }
 
-void Axle::reconfigure(const AxleConfig& axle_config, uint32_t /*level*/)
+void Axle::reconfigure(AxleConfig& axle_config, uint32_t /*level*/)
 {
+  if (axle_config.wheel_diameter == 0.0)
+  {
+    ROS_ERROR("Parameter wheel_diameter is zero");
+  }
+
+  if (axle_config_)
+  {
+    if (axle_config.is_steered != axle_config_->is_steered)
+    {
+      ROS_ERROR("Parameter is_steered cannot be changed dynamically");
+      axle_config.is_steered = axle_config_->is_steered;
+    }
+
+    if (axle_config.is_driven != axle_config_->is_driven)
+    {
+      ROS_ERROR("Parameter is_driven cannot be changed dynamically");
+      axle_config.is_driven = axle_config_->is_driven;
+    }
+  }
+  else
+  {
+    // Initialize motors when callback is called for the first time (which happens when we call setCallback):
+    if (axle_config.is_steered)
+    {
+      ros::NodeHandle steering_motor_nh(nh_, "steering_motor");
+      steering_motor_.emplace(motor_factory_, steering_motor_nh, common_config_.publish_motor_speed);
+    }
+
+    if (axle_config.is_driven)
+    {
+      ros::NodeHandle left_motor_nh(nh_, "left_motor");
+      left_motor_.emplace(motor_factory_, left_motor_nh, common_config_.publish_motor_speed);
+
+      ros::NodeHandle right_motor_nh(nh_, "right_motor");
+      right_motor_.emplace(motor_factory_, right_motor_nh, common_config_.publish_motor_speed);
+    }
+  }
+
   axle_config_ = axle_config;
 
-  if (axle_config_.wheel_diameter == 0.0)
-  {
-    ROS_ERROR("Parameter wheel_diameter is not set");
-  }
+  left_wheel_.position_x_ = axle_config_->position_x;
+  left_wheel_.position_y_ = axle_config_->position_y + 0.5 * axle_config_->track;
+  left_wheel_.hinge_position_y_ = axle_config_->position_y + 0.5 * axle_config_->track
+    - axle_config_->steering_hinge_offset;
+  left_wheel_.radius_ = 0.5 * axle_config_->wheel_diameter;
 
-  left_wheel_.position_x_ = axle_config_.position_x;
-  left_wheel_.position_y_ = axle_config_.position_y + 0.5 * axle_config_.track;
-  left_wheel_.hinge_position_y_ = axle_config_.position_y + 0.5 * axle_config_.track - axle_config_.steering_hinge_offset;
-  left_wheel_.radius_ = 0.5 * axle_config_.wheel_diameter;
-  left_wheel_.steering_ = steering_;
-
-  right_wheel_.position_x_ = axle_config_.position_x;
-  right_wheel_.position_y_ = axle_config_.position_y - 0.5 * axle_config_.track;
-  right_wheel_.hinge_position_y_ = axle_config_.position_y - 0.5 * axle_config_.track + axle_config_.steering_hinge_offset;
-  right_wheel_.radius_ = 0.5 * axle_config_.wheel_diameter;
-  right_wheel_.steering_ = steering_;
-
-  if (axle_config_.is_steered && !steering_motor_)
-  {
-    ros::NodeHandle steering_motor_nh(nh_, "steering_motor");
-    steering_motor_.emplace(motor_factory_, steering_motor_nh, common_config_.publish_motor_speed);
-  }
-  else if (!axle_config_.is_steered && steering_motor_)
-  {
-    steering_motor_.reset();
-  }
-
-  if (axle_config_.is_driven && !left_motor_)
-  {
-    ros::NodeHandle left_motor_nh(nh_, "left_motor");
-    left_motor_.emplace(motor_factory_, left_motor_nh, common_config_.publish_motor_speed);
-  }
-  else if (!axle_config_.is_driven && left_motor_)
-  {
-    left_motor_.reset();
-  }
-
-  if (axle_config_.is_driven && !right_motor_)
-  {
-    ros::NodeHandle right_motor_nh(nh_, "right_motor");
-    right_motor_.emplace(motor_factory_, right_motor_nh, common_config_.publish_motor_speed);
-  }
-  else if (!axle_config_.is_driven && right_motor_)
-  {
-    right_motor_.reset();
-  }
+  right_wheel_.position_x_ = axle_config_->position_x;
+  right_wheel_.position_y_ = axle_config_->position_y - 0.5 * axle_config_->track;
+  right_wheel_.hinge_position_y_ = axle_config_->position_y - 0.5 * axle_config_->track
+    + axle_config_->steering_hinge_offset;
+  right_wheel_.radius_ = 0.5 * axle_config_->wheel_diameter;
 }
 
 const AxleConfig& Axle::getConfig() const
 {
-  return axle_config_;
+  return *axle_config_;
 }
 
 void Axle::setCommonConfig(const AckermannConfig& common_config)
@@ -81,11 +86,17 @@ void Axle::setCommonConfig(const AckermannConfig& common_config)
   common_config_ = common_config;
 }
 
-void Axle::setVelocity(const double linear_velocity, const double normalized_steering_angle, const ros::Time& time)
+void Axle::setIcrX(double icr_x)
 {
-  const double tan_normalized_steering_angle = std::tan(normalized_steering_angle);
-  const double axle_steering_angle = std::atan2(tan_normalized_steering_angle * axle_config_.position_x, 1.0);
-  const double angular_velocity = tan_normalized_steering_angle * linear_velocity;
+  steering_->icr_x_ = icr_x;
+}
+
+void Axle::setVelocity(const double linear_velocity, const double steering_angle, const double wheelbase,
+                       const ros::Time& time)
+{
+  const double tan_steering_angle = std::tan(steering_angle);
+  const double axle_steering_angle = std::atan2(tan_steering_angle * steering_->icr_x_, wheelbase);
+  const double angular_velocity = tan_steering_angle * linear_velocity;
 
   double current_steering_angle = 0.0;
   double current_steering_velocity = 0.0;
@@ -165,7 +176,15 @@ void Axle::getVelocityConstraints(const ros::Time& time, VehicleVelocityConstrai
 
 void Axle::getJointStates(const ros::Time& time, sensor_msgs::JointState& joint_states)
 {
-  // TODO
+  if (axle_config_)
+  {
+    if (left_motor_ && !axle_config_->left_wheel_joint.empty())
+    {
+      joint_states.name.push_back(axle_config_->left_wheel_joint);
+      joint_states.position.push_back(left_motor_->getPosition(time));
+      joint_states.velocity.push_back(left_motor_->getVelocity(time));
+    }
+  }
 }
 
 boost::optional<double> Axle::getSupplyVoltage()

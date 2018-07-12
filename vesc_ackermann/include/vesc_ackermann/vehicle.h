@@ -5,6 +5,7 @@
 #define VESC_ACKERMANN_VEHICLE_H
 
 #include <ackermann_msgs/AckermannDrive.h>
+#include <array>
 #include <boost/optional.hpp>
 #include <geometry_msgs/Twist.h>
 #include <ros/node_handle.h>
@@ -44,6 +45,8 @@ protected:
   AckermannConfig common_config_;
   Axle front_axle_;
   Axle rear_axle_;
+  std::array<Axle*, 2> axles_;
+  double wheelbase_ = 0.0;
 };
 }
 

@@ -6,7 +6,6 @@ All rights reserved.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 #include <vesc_ackermann/vesc_ackermann.h>
 #include <angles/angles.h>
 #include <functional>
@@ -28,12 +27,8 @@ VescAckermann::VescAckermann(const ros::NodeHandle& private_nh)
   ROS_DEBUG_STREAM("VescAckermann::VescAckermann::7");
 
   ROS_DEBUG_STREAM("VescAckermann::VescAckermann::1");
-  reconfigure_server_.setCallback(boost::bind(&VescAckermann::reconfigure, this, _1, _2));
-  front_axle_reconfigure_server_.setCallback(boost::bind(&VescAckermann::reconfigureFrontAxle, this, _1, _2));
-  rear_axle_reconfigure_server_.setCallback(boost::bind(&VescAckermann::reconfigureRearAxle, this, _1, _2));
-
-  reinitialize();
-  initialized_ = true;
+  reconfigure_server_.setCallback(
+    std::bind(&VescAckermann::reconfigure, this, std::placeholders::_1, std::placeholders::_2));
 }
 
 void VescAckermann::reconfigure(AckermannConfig& config, uint32_t /*level*/)
@@ -60,17 +55,14 @@ void VescAckermann::reconfigure(AckermannConfig& config, uint32_t /*level*/)
 
   config_ = config;
 
-  if (initialized_)
+  if (vehicle_)
   {
-    reinitialize();
+    vehicle_->setCommonConfig(config_);
   }
-}
-
-void VescAckermann::reinitialize()
-{
-  if (!vehicle_)
+  else
   {
-    vehicle_.emplace(private_nh_, std::make_shared<MotorFactory>(private_nh_, 1.0 / (config_.odometry_rate * 2.1)));
+    vehicle_.emplace(private_nh_, config_,
+                     std::make_shared<MotorFactory>(private_nh_, 1.0 / (config_.odometry_rate * 2.1)));
   }
 
   if (!odom_pub_ && config_.publish_odom)
@@ -127,24 +119,38 @@ void VescAckermann::odomTimerCB(const ros::TimerEvent& event)
 {
   ROS_DEBUG_STREAM("VescAckermann::odomTimerCB::1");
 
-  if (initialized_)
+  if (vehicle_)
   {
+    ROS_DEBUG_STREAM("VescAckermann::odomTimerCB::2");
     updateOdometry(event.current_real);
-    ROS_DEBUG_STREAM("VescAckermann::odomTimerCB::5");
-    publishOdom();
+    ROS_DEBUG_STREAM("VescAckermann::odomTimerCB::3");
 
-    publishSupplyVoltage();
-    ROS_DEBUG_STREAM("VescAckermann::odomTimerCB::6");
+    if (config_.publish_odom || config_.publish_tf)
+    {
+      publishOdometry();
+    }
+
+    if (config_.publish_supply_voltage)
+    {
+      publishSupplyVoltage();
+    }
+
+    if (config_.publish_joint_states)
+    {
+      joint_states_pub_.publish(vehicle_->getJointStates(event.current_real));
+    }
   }
+
+  ROS_DEBUG_STREAM("VescAckermann::odomTimerCB::4");
 }
 
 void VescAckermann::updateOdometry(const ros::Time& time)
 {
-  calcOdomSpeed(time);
-
-  if (!odom_update_time_.isZero())
+  if (time >= odom_update_time_)
   {
-    if (time >= odom_update_time_)
+    odom_velocity_ = vehicle_->getVelocity(time);
+
+    if (!odom_update_time_.isZero())
     {
       const double time_difference = (time - odom_update_time_).toSec();
 
@@ -154,45 +160,17 @@ void VescAckermann::updateOdometry(const ros::Time& time)
       odom_pose_.x += (odom_velocity_.linear.x * cos_yaw - odom_velocity_.linear.y * sin_yaw) * time_difference;
       odom_pose_.y += (odom_velocity_.linear.x * sin_yaw + odom_velocity_.linear.y * cos_yaw) * time_difference;
       odom_pose_.theta = angles::normalize_angle(odom_pose_.theta + odom_velocity_.angular.z * time_difference);
+    }
 
-      odom_update_time_ = time;
-    }
-    else
-    {
-      ROS_WARN("time difference for odom update is negative, skipping update");
-    }
+    odom_update_time_ = time;
   }
   else
   {
-    // Initialize time at first call:
-    odom_update_time_ = time;
+    ROS_WARN("time difference for odom update is negative, skipping update");
   }
 }
 
-void VescAckermann::calcOdomSpeed(const ros::Time& time)
-{
-  // Compute vehicle velocity using pseudo inverse of velocity constraints:
-  VehicleVelocityConstraints constraints;
-  front_axle_->getVelocityConstraints(time, constraints);
-  rear_axle_->getVelocityConstraints(time, constraints);
-
-  Eigen::MatrixXd a(Eigen::MatrixXd::Zero(constraints.size(), 3));
-  Eigen::VectorXd b(Eigen::VectorXd::Zero(constraints.size()));
-  for (size_t i = 0; i < constraints.size(); ++i)
-  {
-    a(i, 0) = constraints[i].a_v_x;
-    a(i, 1) = constraints[i].a_v_y;
-    a(i, 2) = constraints[i].a_v_theta;
-    b(i) = constraints[i].b;
-  }
-
-  Eigen::Vector3d x = a.fullPivHouseholderQr().solve(b);
-  odom_velocity_.linear.x = x(0);
-  odom_velocity_.linear.y = x(1);
-  odom_velocity_.angular.z = x(2);
-}
-
-void VescAckermann::publishOdom()
+void VescAckermann::publishOdometry()
 {
   if (!odom_update_time_.isZero())
   {
@@ -222,27 +200,12 @@ void VescAckermann::publishOdom()
 
 void VescAckermann::publishSupplyVoltage()
 {
-  double supply_voltage = 0.0;
-  int num_measurements = 0;
+  const boost::optional<double> supply_voltage = vehicle_->getSupplyVoltage();
 
-  const boost::optional<double> front_supply_voltage = front_axle_->getSupplyVoltage();
-  if (front_supply_voltage)
-  {
-    supply_voltage += *front_supply_voltage;
-    ++num_measurements;
-  }
-
-  const boost::optional<double> rear_supply_voltage = rear_axle_->getSupplyVoltage();
-  if (rear_supply_voltage)
-  {
-    supply_voltage += *rear_supply_voltage;
-    ++num_measurements;
-  }
-
-  if (num_measurements != 0)
+  if (supply_voltage)
   {
     std_msgs::Float32 msg;
-    msg.data = static_cast<std_msgs::Float32::_data_type>(supply_voltage / num_measurements);
+    msg.data = static_cast<std_msgs::Float32::_data_type>(*supply_voltage);
     supply_voltage_pub_.publish(msg);
   }
 }

@@ -19,6 +19,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <vesc_ackermann/AckermannConfig.h>
 #include <vesc_ackermann/AxleConfig.h>
 #include <vesc_ackermann/drive_motor.h>
+#include <vesc_ackermann/steering.h>
 #include <vesc_ackermann/steering_motor.h>
 #include <vesc_ackermann/types.h>
 #include <vesc_ackermann/wheel.h>
@@ -32,8 +33,9 @@ public:
 
   const AxleConfig& getConfig() const;
   void setCommonConfig(const AckermannConfig& common_config);
+  void setIcrX(double icr_x);
 
-  void setVelocity(double linear_velocity, double normalized_steering_angle, const ros::Time& time);
+  void setVelocity(double linear_velocity, double steering_angle, double wheelbase, const ros::Time& time);
 
   void getVelocityConstraints(const ros::Time& time, VehicleVelocityConstraints& constraints);
 
@@ -42,16 +44,16 @@ public:
   boost::optional<double> getSupplyVoltage();
 
 protected:
-  void reconfigure(const AxleConfig& axle_config, uint32_t level);
+  void reconfigure(AxleConfig& axle_config, uint32_t level);
 
   ros::NodeHandle nh_;
   MotorFactoryPtr motor_factory_;
 
   AckermannConfig common_config_;
-  AxleConfig axle_config_;
+  boost::optional<AxleConfig> axle_config_;
   dynamic_reconfigure::Server<AxleConfig> axle_config_server_;
 
-  SteeringConstPtr steering_;
+  std::shared_ptr<IdealAckermannSteering> steering_;
   Wheel left_wheel_;
   Wheel right_wheel_;
 

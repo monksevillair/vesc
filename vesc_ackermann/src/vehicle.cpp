@@ -17,6 +17,8 @@ Vehicle::Vehicle(const ros::NodeHandle& nh, const AckermannConfig& common_config
   : front_axle_(ros::NodeHandle(nh, "front_axle"), common_config, motor_factory),
     rear_axle_(ros::NodeHandle(nh, "rear_axle"), common_config, motor_factory)
 {
+  axles_.at(0) = &front_axle_;
+  axles_.at(1) = &rear_axle_;
   setCommonConfig(common_config);
 }
 
@@ -39,39 +41,53 @@ void Vehicle::setCommonConfig(const AckermannConfig& common_config)
     icr_x = front_axle_.getConfig().position_x;
   }
 
-  front_axle_.setCommonConfig(common_config_);
-  front_axle_.setIcrX(icr_x);
-  rear_axle_.setCommonConfig(common_config_);
-  rear_axle_.setIcrX(icr_x);
+  wheelbase_ = std::max(std::fabs(front_axle_.getConfig().position_x - icr_x),
+                        std::fabs(rear_axle_.getConfig().position_x - icr_x));
+
+  for (Axle* const axle : axles_)
+  {
+    axle->setCommonConfig(common_config_);
+    axle->setIcrX(icr_x);
+  }
 }
 
 void Vehicle::setVelocity(const ackermann_msgs::AckermannDrive& velocity)
 {
-  // TODO: this assumes that the steering velocity in the message is related to the vehicle wheelbase. Is this correct?
+  const double linear_velocity = std::max(std::min<double>(velocity.speed, common_config_.max_velocity_linear),
+                                          -common_config_.max_velocity_linear);
   const double steering_angle = std::max(std::min<double>(velocity.steering_angle, common_config_.max_steering_angle),
                                          -common_config_.max_steering_angle);
-  const double normalized_steering_angle = std::atan2(std::tan(steering_angle), common_config_.wheelbase);
 
   const ros::Time now = ros::Time::now();
-  front_axle_.setVelocity(velocity.speed, normalized_steering_angle, now);
-  rear_axle_.setVelocity(velocity.speed, normalized_steering_angle, now);
+  for (Axle* const axle : axles_)
+  {
+    axle->setVelocity(linear_velocity, steering_angle, wheelbase_, now);
+  }
 }
 
 void Vehicle::setVelocity(const geometry_msgs::Twist& velocity)
 {
-  const double normalized_steering_angle = std::atan2(velocity.angular.z, velocity.linear.x);
+  const double linear_velocity = std::max(std::min<double>(velocity.linear.x, common_config_.max_velocity_linear),
+                                          -common_config_.max_velocity_linear);
+  const double steering_angle
+    = std::max(std::min<double>(std::atan2(wheelbase_ * velocity.angular.z, velocity.linear.x),
+                                common_config_.max_steering_angle), -common_config_.max_steering_angle);
 
   const ros::Time now = ros::Time::now();
-  front_axle_.setVelocity(velocity.linear.x, normalized_steering_angle, now);
-  rear_axle_.setVelocity(velocity.linear.x, normalized_steering_angle, now);
+  for (Axle* const axle : axles_)
+  {
+    axle->setVelocity(velocity.linear.x, steering_angle, wheelbase_, now);
+  }
 }
 
 geometry_msgs::Twist Vehicle::getVelocity(const ros::Time& time)
 {
   // Compute vehicle velocity using pseudo inverse of velocity constraints:
   VehicleVelocityConstraints constraints;
-  front_axle_.getVelocityConstraints(time, constraints);
-  rear_axle_.getVelocityConstraints(time, constraints);
+  for (Axle* const axle : axles_)
+  {
+    axle->getVelocityConstraints(time, constraints);
+  }
 
   Eigen::MatrixXd a(Eigen::MatrixXd::Zero(constraints.size(), 3));
   Eigen::VectorXd b(Eigen::VectorXd::Zero(constraints.size()));
@@ -95,8 +111,33 @@ geometry_msgs::Twist Vehicle::getVelocity(const ros::Time& time)
 sensor_msgs::JointState Vehicle::getJointStates(const ros::Time& time)
 {
   sensor_msgs::JointState joint_states;
-  front_axle_.getJointStates(time, joint_states);
-  rear_axle_.getJointStates(time, joint_states);
+  for (Axle* const axle : axles_)
+  {
+    axle->getJointStates(time, joint_states);
+  }
   return joint_states;
+}
+
+boost::optional<double> Vehicle::getSupplyVoltage()
+{
+  double supply_voltage = 0.0;
+  int num_measurements = 0;
+
+  for (Axle* const axle : axles_)
+  {
+    const boost::optional<double> axle_supply_voltage = axle->getSupplyVoltage();
+    if (axle_supply_voltage)
+    {
+      supply_voltage += *axle_supply_voltage;
+      ++num_measurements;
+    }
+  }
+
+  if (num_measurements != 0)
+  {
+    return supply_voltage / num_measurements;
+  }
+
+  return boost::none;
 }
 }

@@ -37,7 +37,6 @@ public:
   double computeWheelSteeringVelocity(const Wheel& wheel, double steering_angle,
                                       double steering_velocity) const override;
 
-protected:
   double icr_x_;
 };
 }
