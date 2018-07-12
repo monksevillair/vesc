@@ -13,15 +13,14 @@ namespace vesc_ackermann
 class MotorFactory
 {
 public:
-  explicit MotorFactory(const ros::NodeHandle& nh);
-  MotorFactory(const ros::NodeHandle& nh, const std::string& parameter_name);
+  MotorFactory(const ros::NodeHandle& nh, double control_interval);
 
-  std::shared_ptr<vesc_motor::VescDriveMotor> createDriveMotor(ros::NodeHandle& private_nh, double control_interval);
-  std::shared_ptr<vesc_motor::VescSteeringMotor> createSteeringMotor(ros::NodeHandle& private_nh,
-                                                                     double control_interval);
+  std::shared_ptr<vesc_motor::VescDriveMotor> createDriveMotor(ros::NodeHandle& private_nh);
+  std::shared_ptr<vesc_motor::VescSteeringMotor> createSteeringMotor(ros::NodeHandle& private_nh);
 
 protected:
   std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory_;
+  double control_interval_;
 };
 }
 

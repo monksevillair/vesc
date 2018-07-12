@@ -19,6 +19,7 @@ namespace vesc_ackermann
 class Wheel
 {
 public:
+  Wheel() = default;
   Wheel(double position_x, double position_y, double hinge_position_y, double radius, const SteeringConstPtr& steering);
 
   /**

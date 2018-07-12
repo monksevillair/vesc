@@ -11,12 +11,14 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 #include <ackermann_msgs/AckermannDrive.h>
 #include <dynamic_reconfigure/server.h>
+#include <geometry_msgs/Pose2D.h>
+#include <geometry_msgs/Twist.h>
 #include <tf/transform_broadcaster.h>
 #include <vesc_ackermann/AckermannConfig.h>
 #include <vesc_ackermann/axle.h>
 #include <vesc_ackermann/AxleConfig.h>
 #include <vesc_ackermann/types.h>
-#include <vesc_ackermann/vehicle_velocity.h>
+#include <vesc_ackermann/vehicle.h>
 #include <vesc_motor/vesc_transport_factory.h>
 
 namespace vesc_ackermann
@@ -27,51 +29,41 @@ public:
   explicit VescAckermann(const ros::NodeHandle& private_nh);
 
 protected:
-  void commandVelocityCB(const ackermann_msgs::AckermannDriveConstPtr& cmd_vel);
-  void calcOdomSpeed(const ros::Time& time);
-  void publishSupplyVoltage();
-
   void reconfigure(AckermannConfig& config, uint32_t level);
-  void reconfigureFrontAxle(AxleConfig& config, uint32_t level);
-  void reconfigureRearAxle(AxleConfig& config, uint32_t level);
   void reinitialize();
+
+  void processVelocityCommand(const geometry_msgs::TwistConstPtr& cmd_vel);
+  void processAckermannCommand(const ackermann_msgs::AckermannDriveConstPtr& cmd_vel);
 
   void odomTimerCB(const ros::TimerEvent& event);
   void updateOdometry(const ros::Time& time);
+  void calcOdomSpeed(const ros::Time& time);
   void publishOdom();
 
+  void publishSupplyVoltage();
+
   ros::NodeHandle private_nh_;
-  ros::NodeHandle front_axle_private_nh_;
-  ros::NodeHandle rear_axle_private_nh_;
 
   AckermannConfig config_;
-  AxleConfig front_axle_config_;
-  AxleConfig rear_axle_config_;
 
   dynamic_reconfigure::Server<AckermannConfig> reconfigure_server_;
-  dynamic_reconfigure::Server<AxleConfig> front_axle_reconfigure_server_;
-  dynamic_reconfigure::Server<AxleConfig> rear_axle_reconfigure_server_;
-
-  MotorFactoryPtr motor_factory_;
-
-  AxlePtr front_axle_;
-  AxlePtr rear_axle_;
 
   bool initialized_ = false;
 
+  boost::optional<Vehicle> vehicle_;
+
   ros::Time odom_update_time_;
 
-  VehicleVelocity velocity_odom_;
-
-  double x_odom_ = 0.0;
-  double y_odom_ = 0.0;
-  double yaw_odom_ = 0.0;
+  geometry_msgs::Pose2D odom_pose_;
+  geometry_msgs::Twist odom_velocity_;
 
   ros::Publisher odom_pub_;
-  tf::TransformBroadcaster tf_broadcaster_;
-  ros::Publisher battery_voltage_pub_;
+  boost::optional<tf::TransformBroadcaster> tf_broadcaster_;
+  ros::Publisher joint_states_pub_;
+  ros::Publisher supply_voltage_pub_;
 
-  ros::Subscriber cmd_vel_sub_;
+  ros::Subscriber cmd_vel_twist_sub_;
+  ros::Subscriber cmd_vel_ackermann_sub_;
 
   ros::Timer odom_timer_;
 };

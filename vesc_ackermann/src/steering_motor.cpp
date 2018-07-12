@@ -11,24 +11,54 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_ackermann
 {
-SteeringMotor::SteeringMotor(const MotorFactoryPtr& motor_factory, ros::NodeHandle& private_nh, double control_interval,
+SteeringMotor::SteeringMotor(const MotorFactoryPtr& motor_factory, ros::NodeHandle& private_nh,
                              bool publish_motor_position)
-  : motor_(motor_factory->createSteeringMotor(private_nh, control_interval)),
-    motor_position_sent_(private_nh, "position_sent", publish_motor_position),
-    motor_position_received_(private_nh, "position_received", publish_motor_position)
+  : motor_(motor_factory->createSteeringMotor(private_nh)),
+    position_sent_publisher_(private_nh, "position_sent", publish_motor_position),
+    position_received_publisher_(private_nh, "position_received", publish_motor_position)
 {
 }
 
 double SteeringMotor::getPosition(const ros::Time& time)
 {
-  double result = motor_->getPosition(time);
-  motor_position_received_.publish(result);
-  return result;
+  const double position = motor_->getPosition(time);
+  position_received_publisher_.publish(position);
+
+  if (time > last_position_time_)
+  {
+    if (!last_position_time_.isZero())
+    {
+      const double time_difference = (time - last_position_time_).toSec();
+      if (time_difference < 1.0)
+      {
+        last_velocity_ = (position - last_position_) / time_difference;
+      }
+      else
+      {
+        last_velocity_ = 0.0;
+      }
+    }
+
+    last_position_ = position;
+    last_position_time_ = time;
+  }
+
+  return position;
+}
+
+double SteeringMotor::getVelocity(const ros::Time& time)
+{
+  if (time >= (last_position_time_ + ros::Duration(0.1)))
+  {
+    getPosition(time);
+  }
+
+  return last_velocity_;
 }
 
 void SteeringMotor::setPosition(double position)
 {
-  motor_position_sent_.publish(position);
+  position_sent_publisher_.publish(position);
   motor_->setPosition(position);
 }
 

@@ -9,27 +9,22 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 #include <vesc_ackermann/vesc_ackermann.h>
 #include <angles/angles.h>
-#include <Eigen/Core>
-#include <Eigen/QR>
 #include <functional>
 #include <nav_msgs/Odometry.h>
+#include <sensor_msgs/JointState.h>
 #include <std_msgs/Float32.h>
 #include <vesc_ackermann/motor_factory.h>
 
 namespace vesc_ackermann
 {
 VescAckermann::VescAckermann(const ros::NodeHandle& private_nh)
-  : private_nh_(private_nh), front_axle_private_nh_(private_nh_, "front_axle"),
-    rear_axle_private_nh_(private_nh_, "rear_axle"), reconfigure_server_(private_nh_),
-    front_axle_reconfigure_server_(front_axle_private_nh_), rear_axle_reconfigure_server_(rear_axle_private_nh_),
-    motor_factory_(std::make_shared<MotorFactory>(private_nh_)), velocity_odom_(0.0, 0.0, 0.0)
+  : private_nh_(private_nh), reconfigure_server_(private_nh_)
 {
   ROS_DEBUG_STREAM("VescAckermann::VescAckermann::4");
 
-  cmd_vel_sub_ = private_nh_.subscribe("/cmd_vel", 1, &VescAckermann::commandVelocityCB, this);
-  ROS_DEBUG_STREAM("VescAckermann::VescAckermann::5");
+  cmd_vel_twist_sub_ = private_nh_.subscribe("cmd_vel", 1, &VescAckermann::processVelocityCommand, this);
+  cmd_vel_ackermann_sub_ = private_nh_.subscribe("cmd_vel_ackermann", 1, &VescAckermann::processAckermannCommand, this);
 
-  battery_voltage_pub_ = private_nh_.advertise<std_msgs::Float32>("/battery_voltage", 1);
   ROS_DEBUG_STREAM("VescAckermann::VescAckermann::7");
 
   ROS_DEBUG_STREAM("VescAckermann::VescAckermann::1");
@@ -71,68 +66,11 @@ void VescAckermann::reconfigure(AckermannConfig& config, uint32_t /*level*/)
   }
 }
 
-void VescAckermann::reconfigureFrontAxle(AxleConfig& config, uint32_t /*level*/)
-{
-  if (config.wheel_diameter == 0.0)
-  {
-    ROS_ERROR("Parameter wheel_diameter is not set");
-  }
-
-  front_axle_config_ = config;
-
-  if (initialized_)
-  {
-    reinitialize();
-  }
-}
-
-void VescAckermann::reconfigureRearAxle(AxleConfig& config, uint32_t /*level*/)
-{
-  if (config.wheel_diameter == 0.0)
-  {
-    ROS_ERROR("Parameter wheel_diameter is not set");
-  }
-
-  rear_axle_config_ = config;
-
-  if (initialized_)
-  {
-    reinitialize();
-  }
-}
-
 void VescAckermann::reinitialize()
 {
-  if (!front_axle_)
+  if (!vehicle_)
   {
-    double position_x = 0.0;
-    if (front_axle_config_.is_steered && rear_axle_config_.is_steered)
-    {
-      position_x = config_.wheelbase * (1.0 - config_.icr_line_relative_position);
-    }
-    else if (front_axle_config_.is_steered)
-    {
-      position_x = config_.wheelbase;
-    }
-
-    front_axle_ = std::make_shared<Axle>(front_axle_private_nh_, config_, front_axle_config_, motor_factory_,
-                                         position_x);
-  }
-
-  if (!rear_axle_)
-  {
-    double position_x = 0.0;
-    if (front_axle_config_.is_steered && rear_axle_config_.is_steered)
-    {
-      position_x = -config_.wheelbase * config_.icr_line_relative_position;
-    }
-    else if (rear_axle_config_.is_steered)
-    {
-      position_x = -config_.wheelbase;
-    }
-
-    rear_axle_ = std::make_shared<Axle>(rear_axle_private_nh_, config_, rear_axle_config_, motor_factory_,
-                                        position_x);
+    vehicle_.emplace(private_nh_, std::make_shared<MotorFactory>(private_nh_, 1.0 / (config_.odometry_rate * 2.1)));
   }
 
   if (!odom_pub_ && config_.publish_odom)
@@ -144,10 +82,44 @@ void VescAckermann::reinitialize()
     odom_pub_.shutdown();
   }
 
+  if (!supply_voltage_pub_ && config_.publish_supply_voltage)
+  {
+    supply_voltage_pub_ = private_nh_.advertise<std_msgs::Float32>("supply_voltage", 1);
+  }
+  else if (supply_voltage_pub_ && !config_.publish_supply_voltage)
+  {
+    supply_voltage_pub_.shutdown();
+  }
+
+  if (!joint_states_pub_ && config_.publish_joint_states)
+  {
+    joint_states_pub_ = private_nh_.advertise<sensor_msgs::JointState>("/joint_states", 1);
+  }
+  else if (joint_states_pub_ && !config_.publish_joint_states)
+  {
+    joint_states_pub_.shutdown();
+  }
+
   if (!odom_timer_)
   {
     odom_timer_ = private_nh_.createTimer(ros::Duration(1.0 / config_.odometry_rate), &VescAckermann::odomTimerCB,
                                           this);
+  }
+}
+
+void VescAckermann::processVelocityCommand(const geometry_msgs::TwistConstPtr& cmd_vel)
+{
+  if (vehicle_)
+  {
+    vehicle_->setVelocity(*cmd_vel);
+  }
+}
+
+void VescAckermann::processAckermannCommand(const ackermann_msgs::AckermannDriveConstPtr& cmd_vel)
+{
+  if (vehicle_)
+  {
+    vehicle_->setVelocity(*cmd_vel);
   }
 }
 
@@ -172,64 +144,79 @@ void VescAckermann::updateOdometry(const ros::Time& time)
 
   if (!odom_update_time_.isZero())
   {
-    const double time_difference = (time - odom_update_time_).toSec();
+    if (time >= odom_update_time_)
+    {
+      const double time_difference = (time - odom_update_time_).toSec();
 
-    if (time_difference < 0.0)
+      const double sin_yaw = std::sin(odom_pose_.theta);
+      const double cos_yaw = std::cos(odom_pose_.theta);
+
+      odom_pose_.x += (odom_velocity_.linear.x * cos_yaw - odom_velocity_.linear.y * sin_yaw) * time_difference;
+      odom_pose_.y += (odom_velocity_.linear.x * sin_yaw + odom_velocity_.linear.y * cos_yaw) * time_difference;
+      odom_pose_.theta = angles::normalize_angle(odom_pose_.theta + odom_velocity_.angular.z * time_difference);
+
+      odom_update_time_ = time;
+    }
+    else
     {
       ROS_WARN("time difference for odom update is negative, skipping update");
-      return;
     }
+  }
+  else
+  {
+    // Initialize time at first call:
+    odom_update_time_ = time;
+  }
+}
 
-    const double sin_yaw = std::sin(yaw_odom_);
-    const double cos_yaw = std::cos(yaw_odom_);
+void VescAckermann::calcOdomSpeed(const ros::Time& time)
+{
+  // Compute vehicle velocity using pseudo inverse of velocity constraints:
+  VehicleVelocityConstraints constraints;
+  front_axle_->getVelocityConstraints(time, constraints);
+  rear_axle_->getVelocityConstraints(time, constraints);
 
-    x_odom_ += (velocity_odom_.v_x * cos_yaw - velocity_odom_.v_y * sin_yaw) * time_difference;
-    y_odom_ += (velocity_odom_.v_x * sin_yaw + velocity_odom_.v_y * cos_yaw) * time_difference;
-    yaw_odom_ = angles::normalize_angle(yaw_odom_ + velocity_odom_.v_theta * time_difference);
+  Eigen::MatrixXd a(Eigen::MatrixXd::Zero(constraints.size(), 3));
+  Eigen::VectorXd b(Eigen::VectorXd::Zero(constraints.size()));
+  for (size_t i = 0; i < constraints.size(); ++i)
+  {
+    a(i, 0) = constraints[i].a_v_x;
+    a(i, 1) = constraints[i].a_v_y;
+    a(i, 2) = constraints[i].a_v_theta;
+    b(i) = constraints[i].b;
   }
 
-  odom_update_time_ = time;
+  Eigen::Vector3d x = a.fullPivHouseholderQr().solve(b);
+  odom_velocity_.linear.x = x(0);
+  odom_velocity_.linear.y = x(1);
+  odom_velocity_.angular.z = x(2);
 }
 
 void VescAckermann::publishOdom()
 {
-  const tf::Pose odom_pose(tf::createQuaternionFromYaw(yaw_odom_), tf::Vector3(x_odom_, y_odom_, 0.));
-
-  if (config_.publish_odom)
+  if (!odom_update_time_.isZero())
   {
-    nav_msgs::Odometry odom_msg;
-    odom_msg.header.stamp = odom_update_time_;
-    odom_msg.header.frame_id = config_.odom_frame;
-    odom_msg.child_frame_id = config_.base_frame;
+    const tf::Pose pose(tf::createQuaternionFromYaw(odom_pose_.theta), tf::Vector3(odom_pose_.x, odom_pose_.y, 0.0));
 
-    tf::poseTFToMsg(odom_pose, odom_msg.pose.pose);
+    if (config_.publish_odom)
+    {
+      nav_msgs::Odometry odom_msg;
+      odom_msg.header.stamp = odom_update_time_;
+      odom_msg.header.frame_id = config_.odom_frame;
+      odom_msg.child_frame_id = config_.base_frame;
 
-    odom_msg.twist.twist.linear.x = velocity_odom_.v_x;
-    odom_msg.twist.twist.linear.y = velocity_odom_.v_y;
-    odom_msg.twist.twist.angular.z = velocity_odom_.v_theta;
+      tf::poseTFToMsg(pose, odom_msg.pose.pose);
 
-    odom_pub_.publish(odom_msg);
-  }
+      odom_msg.twist.twist = odom_velocity_;
 
-  if (config_.publish_tf)
-  {
-    const tf::StampedTransform transform(odom_pose, odom_update_time_, config_.odom_frame, config_.base_frame);
-    tf_broadcaster_.sendTransform(transform);
-  }
-}
+      odom_pub_.publish(odom_msg);
+    }
 
-void VescAckermann::commandVelocityCB(const ackermann_msgs::AckermannDriveConstPtr& cmd_vel)
-{
-  if (initialized_)
-  {
-    // TODO: this assumes that the steering velocity in the message is related to the vehicle wheelbase. Is this correct?
-    const double steering_angle = std::max(std::min<double>(cmd_vel->steering_angle, config_.max_steering_angle),
-                                           -config_.max_steering_angle);
-    const double normalized_steering_angle = std::atan2(std::tan(steering_angle), config_.wheelbase);
-
-    const ros::Time now = ros::Time::now();
-    front_axle_->setVelocity(cmd_vel->speed, normalized_steering_angle, now);
-    rear_axle_->setVelocity(cmd_vel->speed, normalized_steering_angle, now);
+    if (config_.publish_tf)
+    {
+      const tf::StampedTransform transform(pose, odom_update_time_, config_.odom_frame, config_.base_frame);
+      tf_broadcaster_->sendTransform(transform);
+    }
   }
 }
 
@@ -256,30 +243,7 @@ void VescAckermann::publishSupplyVoltage()
   {
     std_msgs::Float32 msg;
     msg.data = static_cast<std_msgs::Float32::_data_type>(supply_voltage / num_measurements);
-    battery_voltage_pub_.publish(msg);
+    supply_voltage_pub_.publish(msg);
   }
-}
-
-void VescAckermann::calcOdomSpeed(const ros::Time& time)
-{
-  // Compute vehicle velocity using pseudo inverse of velocity constraints:
-  VehicleVelocityConstraints constraints;
-  front_axle_->getVelocityConstraints(time, constraints);
-  rear_axle_->getVelocityConstraints(time, constraints);
-
-  Eigen::MatrixXd a(Eigen::MatrixXd::Zero(constraints.size(), 3));
-  Eigen::VectorXd b(Eigen::VectorXd::Zero(constraints.size()));
-  for (size_t i = 0; i < constraints.size(); ++i)
-  {
-    a(i, 0) = constraints[i].a_v_x;
-    a(i, 1) = constraints[i].a_v_y;
-    a(i, 2) = constraints[i].a_v_theta;
-    b(i) = constraints[i].b;
-  }
-
-  Eigen::Vector3d x = a.fullPivHouseholderQr().solve(b);
-  velocity_odom_.v_x = x(0);
-  velocity_odom_.v_y = x(1);
-  velocity_odom_.v_theta = x(2);
 }
 }

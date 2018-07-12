@@ -8,42 +8,83 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
  */
 #include <vesc_ackermann/axle.h>
 #include <vesc_ackermann/steering.h>
-#include <vesc_ackermann/vehicle_velocity.h>
+#include <vesc_ackermann/vehicle.h>
 
 namespace vesc_ackermann
 {
-Axle::Axle(const ros::NodeHandle& nh, const AckermannConfig& common_config, const AxleConfig& axle_config,
-           const MotorFactoryPtr& motor_factory, double position_x)
-  : common_config_(common_config), axle_config_(axle_config), position_x_(position_x),
-    steering_(std::make_shared<IdealAckermannSteering>(0.0)),
-    left_wheel_(position_x, 0.5 * axle_config.track, 0.5 * axle_config.track - axle_config.steering_hinge_offset,
-                0.5 * axle_config.wheel_diameter, steering_),
-    right_wheel_(position_x, -0.5 * axle_config.track, -(0.5 * axle_config.track - axle_config.steering_hinge_offset),
-                 0.5 * axle_config.wheel_diameter, steering_)
+Axle::Axle(const ros::NodeHandle& nh, const AckermannConfig& common_config, const MotorFactoryPtr& motor_factory)
+  : nh_(nh), motor_factory_(motor_factory), common_config_(common_config), axle_config_server_(nh),
+    steering_(std::make_shared<IdealAckermannSteering>(0.0))
 {
-  const double motor_control_interval = 1.0 / (common_config_.odometry_rate * 2.1);
+  axle_config_server_.setCallback(std::bind(&Axle::reconfigure, this, std::placeholders::_1, std::placeholders::_2));
+}
 
-  if (axle_config_.is_steered)
+void Axle::reconfigure(const AxleConfig& axle_config, uint32_t /*level*/)
+{
+  axle_config_ = axle_config;
+
+  if (axle_config_.wheel_diameter == 0.0)
   {
-    ros::NodeHandle steering_motor_nh(nh, "steering_motor");
-    steering_motor_.emplace(motor_factory, steering_motor_nh, motor_control_interval,
-                            common_config_.publish_motor_speed);
+    ROS_ERROR("Parameter wheel_diameter is not set");
   }
 
-  if (axle_config_.is_driven)
-  {
-    ros::NodeHandle left_motor_nh(nh, "left_motor");
-    left_motor_.emplace(motor_factory, left_motor_nh, motor_control_interval, common_config_.publish_motor_speed);
+  left_wheel_.position_x_ = axle_config_.position_x;
+  left_wheel_.position_y_ = axle_config_.position_y + 0.5 * axle_config_.track;
+  left_wheel_.hinge_position_y_ = axle_config_.position_y + 0.5 * axle_config_.track - axle_config_.steering_hinge_offset;
+  left_wheel_.radius_ = 0.5 * axle_config_.wheel_diameter;
+  left_wheel_.steering_ = steering_;
 
-    ros::NodeHandle right_motor_nh(nh, "right_motor");
-    right_motor_.emplace(motor_factory, right_motor_nh, motor_control_interval, common_config_.publish_motor_speed);
+  right_wheel_.position_x_ = axle_config_.position_x;
+  right_wheel_.position_y_ = axle_config_.position_y - 0.5 * axle_config_.track;
+  right_wheel_.hinge_position_y_ = axle_config_.position_y - 0.5 * axle_config_.track + axle_config_.steering_hinge_offset;
+  right_wheel_.radius_ = 0.5 * axle_config_.wheel_diameter;
+  right_wheel_.steering_ = steering_;
+
+  if (axle_config_.is_steered && !steering_motor_)
+  {
+    ros::NodeHandle steering_motor_nh(nh_, "steering_motor");
+    steering_motor_.emplace(motor_factory_, steering_motor_nh, common_config_.publish_motor_speed);
   }
+  else if (!axle_config_.is_steered && steering_motor_)
+  {
+    steering_motor_.reset();
+  }
+
+  if (axle_config_.is_driven && !left_motor_)
+  {
+    ros::NodeHandle left_motor_nh(nh_, "left_motor");
+    left_motor_.emplace(motor_factory_, left_motor_nh, common_config_.publish_motor_speed);
+  }
+  else if (!axle_config_.is_driven && left_motor_)
+  {
+    left_motor_.reset();
+  }
+
+  if (axle_config_.is_driven && !right_motor_)
+  {
+    ros::NodeHandle right_motor_nh(nh_, "right_motor");
+    right_motor_.emplace(motor_factory_, right_motor_nh, common_config_.publish_motor_speed);
+  }
+  else if (!axle_config_.is_driven && right_motor_)
+  {
+    right_motor_.reset();
+  }
+}
+
+const AxleConfig& Axle::getConfig() const
+{
+  return axle_config_;
+}
+
+void Axle::setCommonConfig(const AckermannConfig& common_config)
+{
+  common_config_ = common_config;
 }
 
 void Axle::setVelocity(const double linear_velocity, const double normalized_steering_angle, const ros::Time& time)
 {
   const double tan_normalized_steering_angle = std::tan(normalized_steering_angle);
-  const double axle_steering_angle = std::atan2(tan_normalized_steering_angle * position_x_, 1.0);
+  const double axle_steering_angle = std::atan2(tan_normalized_steering_angle * axle_config_.position_x, 1.0);
   const double angular_velocity = tan_normalized_steering_angle * linear_velocity;
 
   double current_steering_angle = 0.0;
@@ -80,7 +121,7 @@ void Axle::setVelocity(const double linear_velocity, const double normalized_ste
       && (std::fabs(left_motor_->getVelocity(time)) <= common_config_.allowed_brake_velocity)
       && (std::fabs(right_motor_->getVelocity(time)) <= common_config_.allowed_brake_velocity))
     {
-      ROS_DEBUG_STREAM("VescDifferentialDrive::commandVelocityCB::7");
+      ROS_DEBUG_STREAM("VescDifferentialDrive::processAckermannCommand::7");
 
       ROS_DEBUG_STREAM("brake due to left_velocity: " << left_velocity << ", right_velocity: " << right_velocity);
       left_motor_->brake(common_config_.brake_current);
@@ -88,7 +129,7 @@ void Axle::setVelocity(const double linear_velocity, const double normalized_ste
     }
     else
     {
-      ROS_DEBUG_STREAM("VescDifferentialDrive::commandVelocityCB::8");
+      ROS_DEBUG_STREAM("VescDifferentialDrive::processAckermannCommand::8");
 
       left_motor_->setVelocity(left_velocity);
       right_motor_->setVelocity(right_velocity);
@@ -103,15 +144,7 @@ void Axle::getVelocityConstraints(const ros::Time& time, VehicleVelocityConstrai
   if (steering_motor_)
   {
     steering_angle = steering_motor_->getPosition(time);
-
-    if (!last_steering_angle_time_.isZero() && time > last_steering_angle_time_)
-    {
-      const double time_difference = (time - last_steering_angle_time_).toSec();
-      steering_velocity = (steering_angle - last_steering_angle_) / time_difference;
-    }
-
-    last_steering_angle_time_ = time;
-    last_steering_angle_ = steering_angle;
+    steering_velocity = steering_motor_->getVelocity(time);
   }
 
   boost::optional<double> left_velocity;
@@ -128,6 +161,11 @@ void Axle::getVelocityConstraints(const ros::Time& time, VehicleVelocityConstrai
 
   left_wheel_.computeVehicleVelocityConstraints(left_velocity, steering_angle, steering_velocity, constraints);
   right_wheel_.computeVehicleVelocityConstraints(right_velocity, steering_angle, steering_velocity, constraints);
+}
+
+void Axle::getJointStates(const ros::Time& time, sensor_msgs::JointState& joint_states)
+{
+  // TODO
 }
 
 boost::optional<double> Axle::getSupplyVoltage()

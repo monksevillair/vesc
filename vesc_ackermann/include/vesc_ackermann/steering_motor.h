@@ -9,6 +9,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #ifndef VESC_ACKERMANN_STEERING_MOTOR_H
 #define VESC_ACKERMANN_STEERING_MOTOR_H
 
+#include <ros/time.h>
 #include <std_msgs/Float64.h>
 #include <vesc_ackermann/optional_data_publisher.h>
 #include <vesc_ackermann/types.h>
@@ -19,10 +20,10 @@ namespace vesc_ackermann
 class SteeringMotor
 {
 public:
-  SteeringMotor(const MotorFactoryPtr& motor_factory, ros::NodeHandle& private_nh, double control_interval,
-                bool publish_motor_position);
+  SteeringMotor(const MotorFactoryPtr& motor_factory, ros::NodeHandle& private_nh, bool publish_motor_position);
 
   double getPosition(const ros::Time& time);
+  double getVelocity(const ros::Time& time);
 
   void setPosition(double position);
 
@@ -30,8 +31,11 @@ public:
 
 private:
   std::shared_ptr<vesc_motor::VescSteeringMotor> motor_;
-  OptionalDataPublisher<std_msgs::Float64> motor_position_sent_;
-  OptionalDataPublisher<std_msgs::Float64> motor_position_received_;
+  OptionalDataPublisher<std_msgs::Float64> position_sent_publisher_;
+  OptionalDataPublisher<std_msgs::Float64> position_received_publisher_;
+  double last_position_ = 0.0;
+  double last_velocity_ = 0.0;
+  ros::Time last_position_time_;
 };
 }
 

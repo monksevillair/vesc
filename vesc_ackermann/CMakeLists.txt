@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   nav_msgs
   roscpp
+  sensor_msgs
   tf
   vesc_motor
 )
@@ -84,7 +85,7 @@ add_library(${PROJECT_NAME}
   src/steering.cpp include/vesc_ackermann/steering.h
   src/steering_motor.cpp include/vesc_ackermann/steering_motor.h
   include/vesc_ackermann/types.h
-  src/vehicle_velocity.cpp include/vesc_ackermann/vehicle_velocity.h
+  src/vehicle.cpp include/vesc_ackermann/vehicle.h
   src/vesc_ackermann.cpp include/vesc_ackermann/vesc_ackermann.h
   src/wheel.cpp include/vesc_ackermann/wheel.h
   src/motor_factory.cpp include/vesc_ackermann/motor_factory.h)

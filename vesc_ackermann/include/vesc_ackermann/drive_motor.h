@@ -19,9 +19,9 @@ namespace vesc_ackermann
 class DriveMotor
 {
 public:
-  DriveMotor(const MotorFactoryPtr& motor_factory, ros::NodeHandle& private_nh, double control_interval,
-             bool publish_motor_speed);
+  DriveMotor(const MotorFactoryPtr& motor_factory, ros::NodeHandle& private_nh, bool publish_motor_speed);
 
+  double getPosition(const ros::Time& time);
   double getVelocity(const ros::Time& time);
 
   void setVelocity(double velocity);
@@ -32,8 +32,8 @@ public:
 
 private:
   std::shared_ptr<vesc_motor::VescDriveMotor> motor_;
-  OptionalDataPublisher<std_msgs::Float64> motor_speed_sent_;
-  OptionalDataPublisher<std_msgs::Float64> motor_speed_received_;
+  OptionalDataPublisher<std_msgs::Float64> velocity_sent_publisher_;
+  OptionalDataPublisher<std_msgs::Float64> velocity_received_publisher;
 };
 }
 

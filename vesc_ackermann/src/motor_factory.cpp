@@ -5,25 +5,18 @@
 
 namespace vesc_ackermann
 {
-MotorFactory::MotorFactory(const ros::NodeHandle& nh)
-  : transport_factory_(std::make_shared<vesc_motor::VescTransportFactory>(nh))
+MotorFactory::MotorFactory(const ros::NodeHandle& nh, double control_interval)
+  : transport_factory_(std::make_shared<vesc_motor::VescTransportFactory>(nh)), control_interval_(control_interval)
 {
 }
 
-MotorFactory::MotorFactory(const ros::NodeHandle& nh, const std::string& parameter_name)
-  : transport_factory_(std::make_shared<vesc_motor::VescTransportFactory>(nh, parameter_name))
+std::shared_ptr<vesc_motor::VescDriveMotor> MotorFactory::createDriveMotor(ros::NodeHandle& private_nh)
 {
+  return std::make_shared<vesc_motor::VescDriveMotor>(private_nh, transport_factory_, control_interval_);
 }
 
-std::shared_ptr<vesc_motor::VescDriveMotor> MotorFactory::createDriveMotor(ros::NodeHandle& private_nh,
-                                                                           double control_interval)
+std::shared_ptr<vesc_motor::VescSteeringMotor> MotorFactory::createSteeringMotor(ros::NodeHandle& private_nh)
 {
-  return std::make_shared<vesc_motor::VescDriveMotor>(private_nh, transport_factory_, control_interval);
-}
-
-std::shared_ptr<vesc_motor::VescSteeringMotor> MotorFactory::createSteeringMotor(ros::NodeHandle& private_nh,
-                                                                                 double control_interval)
-{
-  return std::make_shared<vesc_motor::VescSteeringMotor>(private_nh, transport_factory_, control_interval);
+  return std::make_shared<vesc_motor::VescSteeringMotor>(private_nh, transport_factory_, control_interval_);
 }
 }

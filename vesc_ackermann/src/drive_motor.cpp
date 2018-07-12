@@ -11,30 +11,29 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_ackermann
 {
-DriveMotor::DriveMotor(const MotorFactoryPtr& motor_factory, ros::NodeHandle& private_nh, double control_interval,
-                       bool publish_motor_speed)
-  : motor_(motor_factory->createDriveMotor(private_nh, control_interval)),
-    motor_speed_sent_(private_nh, "motor_speed_sent", publish_motor_speed),
-    motor_speed_received_(private_nh, "motor_speed_received", publish_motor_speed)
+DriveMotor::DriveMotor(const MotorFactoryPtr& motor_factory, ros::NodeHandle& private_nh, bool publish_motor_speed)
+  : motor_(motor_factory->createDriveMotor(private_nh)),
+    velocity_sent_publisher_(private_nh, "velocity_sent", publish_motor_speed),
+    velocity_received_publisher(private_nh, "velocity_received", publish_motor_speed)
 {
 }
 
 double DriveMotor::getVelocity(const ros::Time& time)
 {
-  const double result = motor_->getVelocity(time);
-  motor_speed_received_.publish(result);
-  return result;
+  const double velocity = motor_->getVelocity(time);
+  velocity_received_publisher.publish(velocity);
+  return velocity;
 }
 
-void DriveMotor::setVelocity(double velocity)
+void DriveMotor::setVelocity(const double velocity)
 {
-  motor_speed_sent_.publish(velocity);
+  velocity_sent_publisher_.publish(velocity);
   motor_->setVelocity(velocity);
 }
 
-void DriveMotor::brake(double current)
+void DriveMotor::brake(const double current)
 {
-  motor_speed_sent_.publish(0.0);
+  velocity_sent_publisher_.publish(0.0);
   motor_->brake(current);
 }
 

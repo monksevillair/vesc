@@ -6,7 +6,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <vesc_ackermann/steering.h>
-#include <vesc_ackermann/vehicle_velocity.h>
+#include <vesc_ackermann/vehicle.h>
 
 namespace vesc_ackermann
 {
