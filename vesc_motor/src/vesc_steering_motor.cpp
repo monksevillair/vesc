@@ -78,7 +78,7 @@ double VescSteeringMotor::getPosition(const ros::Time& time)
 void VescSteeringMotor::setPosition(double position)
 {
   std::unique_lock<std::mutex> config_lock(config_mutex_);
-  driver_->setSpeed(position * (config_.invert_direction ? -1. : 1.) + config_.position_offset);
+  driver_->setPosition(position * (config_.invert_direction ? -1. : 1.) + config_.position_offset);
 }
 
 void VescSteeringMotor::reconfigure(SteeringMotorConfig& config, uint32_t level)
@@ -99,25 +99,25 @@ void VescSteeringMotor::reconfigure(SteeringMotorConfig& config, uint32_t level)
 
 void VescSteeringMotor::processMotorControllerState(const vesc_driver::MotorControllerState& state)
 {
-  ROS_DEBUG_STREAM("VescSteeringMotor::stateCB::1");
-
   std::unique_lock<std::mutex> state_lock(state_mutex_);
 
-  ROS_DEBUG_STREAM("VescSteeringMotor::stateCB::2");
-
+//  ROS_INFO_STREAM("VescSteeringMotor::processMotorControllerState: position before prediction: "
+//                    << position_kf_.statePost.at<float>(0));
   ros::Time now = ros::Time::now();
   if (predict(now)) // only correct if prediction can be performed
   {
-    ROS_DEBUG_STREAM("VescSteeringMotor::stateCB::3");
-
+//    ROS_INFO_STREAM("VescSteeringMotor::processMotorControllerState: position after prediction: "
+//                      << position_kf_.statePre.at<float>(0));
+//    ROS_INFO_STREAM("VescSteeringMotor::processMotorControllerState: position measurement: "
+//                      << (state.position * (config_.invert_direction ? -1. : 1.) - config_.position_offset));
     correct(state.position * (config_.invert_direction ? -1. : 1.) - config_.position_offset);
   }
   else
   {
     ROS_WARN("Skipping state correction due to failed prediction");
   }
-
-  ROS_DEBUG_STREAM("VescSteeringMotor::stateCB::4 state.voltage_input: " << state.voltage_input);
+//  ROS_INFO_STREAM("VescSteeringMotor::processMotorControllerState: position after correction: "
+//                    << position_kf_.statePost.at<float>(0));
 
   // Call super class implementation:
   VescMotor::processMotorControllerState(state);

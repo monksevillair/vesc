@@ -88,7 +88,7 @@ void VescMotor::processMotorControllerState(const vesc_driver::MotorControllerSt
 
 void VescMotor::callProcessMotorControllerState(const vesc_driver::MotorControllerState& state)
 {
-  // This indirection must be done because boost::bind in the constructor doesn't work right with virtual functions.
+  // This indirection must be done because std::bind in the constructor doesn't work right with virtual functions.
   processMotorControllerState(state);
 }
 }
