@@ -8,6 +8,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
  */
 #include <vesc_ackermann/axle.h>
 #include <vesc_ackermann/steering.h>
+#include <vesc_ackermann/utils.h>
 #include <vesc_ackermann/vehicle.h>
 
 namespace vesc_ackermann
@@ -93,8 +94,9 @@ void Axle::setVelocity(const double linear_velocity, const double steering_angle
                        const ros::Time& time)
 {
   const double tan_steering_angle = std::tan(steering_angle);
-  const double axle_steering_angle = std::atan2(tan_steering_angle * steering_->icr_x_, wheelbase);
-  const double angular_velocity = tan_steering_angle * linear_velocity;
+  const double axle_steering_angle = normalizeSteeringAngle(
+    std::atan2(tan_steering_angle * (axle_config_->position_x - steering_->icr_x_), wheelbase));
+  const double angular_velocity = tan_steering_angle * linear_velocity / wheelbase;
 
   double current_steering_angle = 0.0;
   double current_steering_velocity = 0.0;

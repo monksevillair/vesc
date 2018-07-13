@@ -3,6 +3,7 @@
 //
 #include <vesc_ackermann/steering.h>
 #include <cmath>
+#include <vesc_ackermann/utils.h>
 #include <vesc_ackermann/wheel.h>
 
 namespace vesc_ackermann
@@ -22,7 +23,7 @@ double IdealAckermannSteering::computeWheelSteeringAngle(const Wheel& wheel, con
 
   const double tan_steering_angle = std::tan(steering_angle);
   const double x = wheel.position_x_ - icr_x_;
-  return std::atan2(x * tan_steering_angle, x - wheel.hinge_position_y_ * tan_steering_angle);
+  return normalizeSteeringAngle(std::atan2(x * tan_steering_angle, x - wheel.hinge_position_y_ * tan_steering_angle));
 }
 
 double IdealAckermannSteering::computeWheelSteeringVelocity(const Wheel& wheel, double steering_angle,

@@ -42,6 +42,8 @@ public:
   boost::optional<double> getSupplyVoltage();
 
 protected:
+  double limitSteeringAngle(double steering_angle) const;
+
   AckermannConfig common_config_;
   Axle front_axle_;
   Axle rear_axle_;

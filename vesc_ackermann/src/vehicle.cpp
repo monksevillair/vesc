@@ -4,6 +4,7 @@
 #include <vesc_ackermann/vehicle.h>
 #include <Eigen/Core>
 #include <Eigen/QR>
+#include <vesc_ackermann/utils.h>
 
 namespace vesc_ackermann
 {
@@ -55,8 +56,7 @@ void Vehicle::setVelocity(const ackermann_msgs::AckermannDrive& velocity)
 {
   const double linear_velocity = std::max(std::min<double>(velocity.speed, common_config_.max_velocity_linear),
                                           -common_config_.max_velocity_linear);
-  const double steering_angle = std::max(std::min<double>(velocity.steering_angle, common_config_.max_steering_angle),
-                                         -common_config_.max_steering_angle);
+  const double steering_angle = limitSteeringAngle(velocity.steering_angle);
 
   const ros::Time now = ros::Time::now();
   for (Axle* const axle : axles_)
@@ -69,9 +69,7 @@ void Vehicle::setVelocity(const geometry_msgs::Twist& velocity)
 {
   const double linear_velocity = std::max(std::min<double>(velocity.linear.x, common_config_.max_velocity_linear),
                                           -common_config_.max_velocity_linear);
-  const double steering_angle
-    = std::max(std::min<double>(std::atan2(wheelbase_ * velocity.angular.z, velocity.linear.x),
-                                common_config_.max_steering_angle), -common_config_.max_steering_angle);
+  const double steering_angle = limitSteeringAngle(std::atan2(wheelbase_ * velocity.angular.z, velocity.linear.x));
 
   const ros::Time now = ros::Time::now();
   for (Axle* const axle : axles_)
@@ -140,5 +138,11 @@ boost::optional<double> Vehicle::getSupplyVoltage()
   }
 
   return boost::none;
+}
+
+double Vehicle::limitSteeringAngle(const double steering_angle) const
+{
+  return std::max(-common_config_.max_steering_angle,
+                  std::min(normalizeSteeringAngle(steering_angle), common_config_.max_steering_angle));
 }
 }
