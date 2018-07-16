@@ -33,9 +33,10 @@ void PeriodicTask::stop()
 {
   if (execution_thread_.joinable())
   {
-    std::lock_guard<std::mutex> run_lock(run_mutex_);
+    std::unique_lock<std::mutex> run_lock(run_mutex_);
     running_ = false;
     run_condition_.notify_all();
+    run_lock.unlock();  // Allow execution thread to acquire lock
     execution_thread_.join();
   }
 }

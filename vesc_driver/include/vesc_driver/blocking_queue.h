@@ -38,7 +38,7 @@ public:
   {
     std::unique_lock<std::mutex> queue_lock(queue_mutex_);
 
-    while (queue_.empty())
+    while (queue_.empty() && !interrupt_)
     {
       queue_condition_variable_.wait(queue_lock);
     }
@@ -54,29 +54,6 @@ public:
     return element;
   }
 
-  E peek() throw(InterruptException)
-  {
-    std::unique_lock<std::mutex> queue_lock(queue_mutex_);
-
-    while (queue_.empty())
-    {
-      queue_condition_variable_.wait(queue_lock);
-    }
-
-    if (interrupt_)
-    {
-      throw InterruptException();
-    }
-
-    return queue_.front();
-  }
-
-  bool empty()
-  {
-    std::lock_guard<std::mutex> queue_lock(queue_mutex_);
-    return queue_.empty();
-  }
-
   void interrupt()
   {
     std::lock_guard<std::mutex> queue_lock(queue_mutex_);
@@ -84,13 +61,6 @@ public:
     interrupt_ = true;
 
     queue_condition_variable_.notify_all();
-  }
-
-  void resetInterrupt()
-  {
-    std::lock_guard<std::mutex> queue_lock(queue_mutex_);
-
-    interrupt_ = false;
   }
 
 private:

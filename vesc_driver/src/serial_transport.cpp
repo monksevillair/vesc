@@ -295,15 +295,13 @@ void SerialTransport::writeLoop()
 
 void SerialTransport::stopThreads()
 {
-  bool should_read_expected_value = true;
-  if (should_write_.compare_exchange_strong(should_read_expected_value, false) && write_thread_.joinable())
+  if (should_write_.exchange(false) && write_thread_.joinable())
   {
     write_queue_.interrupt();
     write_thread_.join();
   }
 
-  bool should_write_expected_value = true;
-  if (should_read_.compare_exchange_strong(should_write_expected_value, false) && read_thread_.joinable())
+  if (should_read_.exchange(false) && read_thread_.joinable())
   {
     read_thread_.join();
   }
