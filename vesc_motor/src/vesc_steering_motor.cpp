@@ -17,55 +17,43 @@ VescSteeringMotor::VescSteeringMotor(const ros::NodeHandle& private_nh,
                                      std::shared_ptr<VescTransportFactory> transport_factory, double execution_duration)
   : VescMotor(private_nh, transport_factory, execution_duration), reconfigure_server_(private_nh)
 {
-  ROS_DEBUG_STREAM("VescSteeringMotor::VescSteeringMotor::1");
-
   // Init Kalman filter:
   unsigned int state_size = 2; // [p, v]
   unsigned int meas_size = 1; // [p]
   unsigned int contr_size = 0; // []
-  ROS_DEBUG_STREAM("VescSteeringMotor::VescSteeringMotor::2");
 
   position_kf_ = cv::KalmanFilter(state_size, meas_size, contr_size, CV_32F);
-  ROS_DEBUG_STREAM("VescSteeringMotor::VescSteeringMotor::3");
 
   // Corrected state (x(k)): x(k)=x'(k)+K(k)*(z(k)-H*x'(k)):
   // [p, v]
   position_kf_.statePost.at<float>(0) = 0; // p
   position_kf_.statePost.at<float>(1) = 0; // v
-  ROS_DEBUG_STREAM("VescSteeringMotor::VescSteeringMotor::4");
 
   // State transition matrix (A):
   // [ 1 dT]
   // [ 0 1]
   // Note: set dT at each processing step!
   cv::setIdentity(position_kf_.transitionMatrix);
-  ROS_DEBUG_STREAM("VescSteeringMotor::VescSteeringMotor::5");
 
   // Measurement matrix (H):
   // [ 1 0]
   position_kf_.measurementMatrix.at<float>(0) = 1.0f;
   position_kf_.measurementMatrix.at<float>(1) = 0.0f;
-  ROS_DEBUG_STREAM("VescSteeringMotor::VescSteeringMotor::6");
 
   // Process noise covariance matrix (Q):
   // [ Ev 0  ]
   // [ 0  Ea ]
   position_kf_.processNoiseCov.at<float>(0, 0) = 1e-2f;
   position_kf_.processNoiseCov.at<float>(1, 1) = 1.0f;
-  ROS_DEBUG_STREAM("VescSteeringMotor::VescSteeringMotor::7");
 
   // Measurement noise covariance matrix (R):
   cv::setIdentity(position_kf_.measurementNoiseCov, 1e-1);
-  ROS_DEBUG_STREAM("VescSteeringMotor::VescSteeringMotor::8");
 
   // Priori error estimate covariance matrix (P'(k)): P'(k)=A*P(k-1)*At + Q):
   cv::setIdentity(position_kf_.errorCovPre);
-  ROS_DEBUG_STREAM("VescSteeringMotor::VescSteeringMotor::9");
 
   reconfigure_server_.setCallback(
     std::bind(&VescSteeringMotor::reconfigure, this, std::placeholders::_1, std::placeholders::_2));
-
-  ROS_DEBUG_STREAM("VescSteeringMotor::VescSteeringMotor::10");
 }
 
 double VescSteeringMotor::getPosition(const ros::Time& time)
@@ -73,6 +61,13 @@ double VescSteeringMotor::getPosition(const ros::Time& time)
   std::unique_lock<std::mutex> state_lock(state_mutex_);
   predict(time);
   return position_kf_.statePre.at<float>(0);
+}
+
+double VescSteeringMotor::getVelocity(const ros::Time& time)
+{
+  std::unique_lock<std::mutex> state_lock(state_mutex_);
+  predict(time);
+  return position_kf_.statePre.at<float>(1);
 }
 
 void VescSteeringMotor::setPosition(double position)

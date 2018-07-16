@@ -34,9 +34,7 @@ private:
   std::shared_ptr<vesc_motor::VescSteeringMotor> motor_;
   OptionalDataPublisher<std_msgs::Float64> position_sent_publisher_;
   OptionalDataPublisher<std_msgs::Float64> position_received_publisher_;
-  double last_position_ = 0.0;
-  double last_velocity_ = 0.0;
-  ros::Time last_position_time_;
+  OptionalDataPublisher<std_msgs::Float64> velocity_received_publisher_;
 };
 }
 

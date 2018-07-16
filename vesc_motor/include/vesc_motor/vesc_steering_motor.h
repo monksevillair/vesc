@@ -29,11 +29,18 @@ public:
                     double execution_duration);
 
   /**
-   * Gets the current position motor of the motor in rad, estimated at the given time.
-   * @param time time at which velocity is estimated.
-   * @return the estimated position in rad.
+   * Gets the current position of the motor in radians, estimated at the given time.
+   * @param time time at which motor state is estimated.
+   * @return the estimated position in radians.
    */
   double getPosition(const ros::Time& time);
+
+  /**
+   * Gets the current velocity of the motor in radians per second, estimated at the given time.
+   * @param time time at which motor state is estimated.
+   * @return the estimated velocity in radians per second.
+   */
+  double getVelocity(const ros::Time& time);
 
   /**
    * Commands the motor to the position in rad.
