@@ -33,9 +33,8 @@ public:
 
   const AxleConfig& getConfig() const;
   void setCommonConfig(const AckermannConfig& common_config);
-  void setIcrX(double icr_x);
 
-  void setVelocity(double linear_velocity, double steering_angle, double wheelbase, const ros::Time& time);
+  void setVelocity(double linear_velocity, double angular_velocity, double axle_steering_angle, const ros::Time& time);
 
   void getVelocityConstraints(const ros::Time& time, VehicleVelocityConstraints& constraints);
 

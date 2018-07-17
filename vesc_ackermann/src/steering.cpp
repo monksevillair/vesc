@@ -21,9 +21,10 @@ double IdealAckermannSteering::computeWheelSteeringAngle(const Wheel& wheel, con
     return 0.0;
   }
 
-  const double tan_steering_angle = std::tan(steering_angle);
+  const double sin_steering_angle = std::sin(steering_angle);
   const double x = wheel.position_x_ - icr_x_;
-  return normalizeSteeringAngle(std::atan2(x * tan_steering_angle, x - wheel.hinge_position_y_ * tan_steering_angle));
+  return normalizeSteeringAngle(
+    std::atan2(x * sin_steering_angle, x * std::cos(steering_angle) - wheel.hinge_position_y_ * sin_steering_angle));
 }
 
 double IdealAckermannSteering::computeWheelSteeringVelocity(const Wheel& wheel, double steering_angle,
@@ -38,9 +39,9 @@ double IdealAckermannSteering::computeWheelSteeringVelocity(const Wheel& wheel, 
   // This is the time derivative of the above function:
   const double x = wheel.position_x_ - icr_x_;
   const double x2 = x * x;
-  const double sin_sa = std::sin(steering_angle);
-  const double k = x * std::cos(steering_angle) - wheel.hinge_position_y_ * sin_sa;
+  const double sin_steering_angle = std::sin(steering_angle);
+  const double k = x * std::cos(steering_angle) - wheel.hinge_position_y_ * sin_steering_angle;
 
-  return steering_velocity * x2 / (k * k + x2 * sin_sa * sin_sa);
+  return steering_velocity * x2 / (k * k + x2 * sin_steering_angle * sin_steering_angle);
 }
 }

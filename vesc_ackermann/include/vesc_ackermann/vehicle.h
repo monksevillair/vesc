@@ -34,8 +34,8 @@ public:
 
   void setCommonConfig(const AckermannConfig& common_config);
 
-  void setVelocity(const ackermann_msgs::AckermannDrive& velocity);
-  void setVelocity(const geometry_msgs::Twist& velocity);
+  void setVelocity(const ackermann_msgs::AckermannDrive& velocity, const ros::Time& time);
+  void setVelocity(const geometry_msgs::Twist& velocity, const ros::Time& time);
   geometry_msgs::Twist getVelocity(const ros::Time& time);
   sensor_msgs::JointState getJointStates(const ros::Time& time);
 
@@ -48,7 +48,9 @@ protected:
   Axle front_axle_;
   Axle rear_axle_;
   std::array<Axle*, 2> axles_;
+
   double wheelbase_ = 0.0;
+  double max_steering_angle_ = 0.0;
 };
 }
 

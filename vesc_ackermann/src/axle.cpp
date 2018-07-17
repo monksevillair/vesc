@@ -73,11 +73,17 @@ void Axle::reconfigure(AxleConfig& axle_config, uint32_t /*level*/)
   right_wheel_.position_y_ = axle_config_->position_y - 0.5 * axle_config_->track;
   right_wheel_.hinge_position_y_ = right_wheel_.position_y_ + axle_config_->steering_hinge_offset;
   right_wheel_.radius_ = 0.5 * axle_config_->wheel_diameter;
+
+  steering_->icr_x_ = axle_config_->steering_icr_x;
 }
 
 const AxleConfig& Axle::getConfig() const
 {
-  return *axle_config_;
+  if (axle_config_)
+  {
+    return *axle_config_;
+  }
+  throw std::logic_error("tried to get axle config before setting it");
 }
 
 void Axle::setCommonConfig(const AckermannConfig& common_config)
@@ -85,19 +91,9 @@ void Axle::setCommonConfig(const AckermannConfig& common_config)
   common_config_ = common_config;
 }
 
-void Axle::setIcrX(double icr_x)
-{
-  steering_->icr_x_ = icr_x;
-}
-
-void Axle::setVelocity(const double linear_velocity, const double steering_angle, const double wheelbase,
+void Axle::setVelocity(const double linear_velocity, const double angular_velocity, const double axle_steering_angle,
                        const ros::Time& time)
 {
-  const double tan_steering_angle = std::tan(steering_angle);
-  const double axle_steering_angle = normalizeSteeringAngle(
-    std::atan2(tan_steering_angle * (axle_config_->position_x - steering_->icr_x_), wheelbase));
-  const double angular_velocity = tan_steering_angle * linear_velocity / wheelbase;
-
   double current_steering_angle = 0.0;
   double current_steering_velocity = 0.0;
 

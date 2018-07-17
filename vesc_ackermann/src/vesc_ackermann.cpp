@@ -112,7 +112,7 @@ void VescAckermann::processVelocityCommand(const geometry_msgs::TwistConstPtr& c
 {
   if (vehicle_)
   {
-    vehicle_->setVelocity(*cmd_vel);
+    vehicle_->setVelocity(*cmd_vel, ros::Time::now());
   }
 }
 
@@ -120,7 +120,7 @@ void VescAckermann::processAckermannCommand(const ackermann_msgs::AckermannDrive
 {
   if (vehicle_)
   {
-    vehicle_->setVelocity(*cmd_vel);
+    vehicle_->setVelocity(*cmd_vel, ros::Time::now());
   }
 }
 
