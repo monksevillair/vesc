@@ -11,36 +11,61 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_ackermann
 {
-SteeringMotor::SteeringMotor(const MotorFactoryPtr& motor_factory, ros::NodeHandle& private_nh,
-                             bool publish_motor_position)
-  : motor_(motor_factory->createSteeringMotor(private_nh)),
-    position_sent_publisher_(private_nh, "position_sent", publish_motor_position),
-    position_received_publisher_(private_nh, "position_received", publish_motor_position),
-    velocity_received_publisher_(private_nh, "velocity_received", publish_motor_position)
+VescSteeringMotor::VescSteeringMotor(ros::NodeHandle& private_nh,
+                                     const std::shared_ptr<vesc_motor::VescTransportFactory>& transport_factory,
+                                     double control_interval)
+  : motor_(private_nh, transport_factory, control_interval)
 {
 }
 
-double SteeringMotor::getPosition(const ros::Time& time)
+double VescSteeringMotor::getPosition(const ros::Time& time)
+{
+  return motor_.getPosition(time);
+}
+
+double VescSteeringMotor::getVelocity(const ros::Time& time)
+{
+  return motor_.getVelocity(time);
+}
+
+void VescSteeringMotor::setPosition(double position)
+{
+  motor_.setPosition(position);
+}
+
+boost::optional<double> VescSteeringMotor::getSupplyVoltage()
+{
+  return motor_.getSupplyVoltage();
+}
+
+PublishingSteeringMotor::PublishingSteeringMotor(ros::NodeHandle& private_nh, const SteeringMotorPtr& motor)
+  : motor_(motor), position_sent_publisher_(private_nh, "position_sent", true),
+    position_received_publisher_(private_nh, "position_received", true),
+    velocity_received_publisher_(private_nh, "velocity_received", true)
+{
+}
+
+double PublishingSteeringMotor::getPosition(const ros::Time& time)
 {
   const double position = motor_->getPosition(time);
   position_received_publisher_.publish(position);
   return position;
 }
 
-double SteeringMotor::getVelocity(const ros::Time& time)
+double PublishingSteeringMotor::getVelocity(const ros::Time& time)
 {
   const double velocity = motor_->getVelocity(time);
   velocity_received_publisher_.publish(velocity);
   return velocity;
 }
 
-void SteeringMotor::setPosition(double position)
+void PublishingSteeringMotor::setPosition(double position)
 {
-  position_sent_publisher_.publish(position);
   motor_->setPosition(position);
+  position_sent_publisher_.publish(position);
 }
 
-double SteeringMotor::getSupplyVoltage()
+boost::optional<double> PublishingSteeringMotor::getSupplyVoltage()
 {
   return motor_->getSupplyVoltage();
 }

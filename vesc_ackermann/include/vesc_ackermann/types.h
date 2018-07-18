@@ -13,6 +13,10 @@ class Axle;
 
 typedef std::shared_ptr<Axle> AxlePtr;
 
+class DriveMotor;
+
+typedef std::shared_ptr<DriveMotor> DriveMotorPtr;
+
 class MotorFactory;
 
 typedef std::shared_ptr<MotorFactory> MotorFactoryPtr;
@@ -20,6 +24,10 @@ typedef std::shared_ptr<MotorFactory> MotorFactoryPtr;
 class Steering;
 
 typedef std::shared_ptr<Steering const> SteeringConstPtr;
+
+class SteeringMotor;
+
+typedef std::shared_ptr<SteeringMotor> SteeringMotorPtr;
 
 struct VehicleVelocityConstraint;
 

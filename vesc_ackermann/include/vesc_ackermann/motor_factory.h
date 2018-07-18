@@ -4,8 +4,8 @@
 #ifndef VESC_ACKERMANN_MOTOR_FACTORY_H
 #define VESC_ACKERMANN_MOTOR_FACTORY_H
 
-#include <vesc_motor/vesc_drive_motor.h>
-#include <vesc_motor/vesc_steering_motor.h>
+#include <ros/node_handle.h>
+#include <vesc_ackermann/types.h>
 #include <vesc_motor/vesc_transport_factory.h>
 
 namespace vesc_ackermann
@@ -13,14 +13,15 @@ namespace vesc_ackermann
 class MotorFactory
 {
 public:
-  MotorFactory(const ros::NodeHandle& nh, double control_interval);
+  MotorFactory(const ros::NodeHandle& nh, double control_interval, bool publish_motor_states);
 
-  std::shared_ptr<vesc_motor::VescDriveMotor> createDriveMotor(ros::NodeHandle& private_nh);
-  std::shared_ptr<vesc_motor::VescSteeringMotor> createSteeringMotor(ros::NodeHandle& private_nh);
+  DriveMotorPtr createDriveMotor(ros::NodeHandle& private_nh);
+  SteeringMotorPtr createSteeringMotor(ros::NodeHandle& private_nh);
 
 protected:
   std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory_;
   double control_interval_;
+  bool publish_motor_states_;
 };
 }
 

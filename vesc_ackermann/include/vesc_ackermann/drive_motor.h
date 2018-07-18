@@ -9,6 +9,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #ifndef VESC_ACKERMANN_DRIVE_MOTOR_H
 #define VESC_ACKERMANN_DRIVE_MOTOR_H
 
+#include <boost/optional.hpp>
 #include <ros/node_handle.h>
 #include <ros/time.h>
 #include <std_msgs/Float64.h>
@@ -21,24 +22,60 @@ namespace vesc_ackermann
 class DriveMotor
 {
 public:
-  DriveMotor(const MotorFactoryPtr& motor_factory, ros::NodeHandle& private_nh, bool publish_motor_speed);
+  virtual ~DriveMotor() = default;
 
-  double getPosition(const ros::Time& time);
-  double getVelocity(const ros::Time& time);
+  virtual double getPosition(const ros::Time& time) = 0;
+  virtual double getVelocity(const ros::Time& time) = 0;
 
-  void setVelocity(double velocity);
+  virtual void setVelocity(double velocity) = 0;
 
-  void brake(double current);
+  virtual void brake(double current) = 0;
 
-  double getSupplyVoltage();
+  virtual boost::optional<double> getSupplyVoltage() = 0;
+};
+
+class VescDriveMotor : public DriveMotor
+{
+public:
+  VescDriveMotor(ros::NodeHandle& private_nh,
+                 const std::shared_ptr<vesc_motor::VescTransportFactory>& transport_factory,
+                 double control_interval);
+
+  double getPosition(const ros::Time& time) override;
+  double getVelocity(const ros::Time& time) override;
+
+  void setVelocity(double velocity) override;
+
+  void brake(double current) override;
+
+  boost::optional<double> getSupplyVoltage() override;
 
 private:
-  std::shared_ptr<vesc_motor::VescDriveMotor> motor_;
-  OptionalDataPublisher<std_msgs::Float64> velocity_sent_publisher_;
-  OptionalDataPublisher<std_msgs::Float64> velocity_received_publisher;
+  vesc_motor::VescDriveMotor motor_;
   double last_position_ = 0.0;
   double last_velocity_ = 0.0;
   ros::Time last_velocity_time_;
+};
+
+class PublishingDriveMotor : public DriveMotor
+{
+public:
+  PublishingDriveMotor(ros::NodeHandle& private_nh, const DriveMotorPtr& motor);
+
+  double getPosition(const ros::Time& time) override;
+  double getVelocity(const ros::Time& time) override;
+
+  void setVelocity(double velocity) override;
+
+  void brake(double current) override;
+
+  boost::optional<double> getSupplyVoltage() override;
+
+private:
+  DriveMotorPtr motor_;
+  OptionalDataPublisher<std_msgs::Float64> velocity_sent_publisher_;
+  OptionalDataPublisher<std_msgs::Float64> velocity_received_publisher_;
+  OptionalDataPublisher<std_msgs::Float64> position_received_publisher_;
 };
 }
 

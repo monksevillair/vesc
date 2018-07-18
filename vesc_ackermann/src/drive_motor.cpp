@@ -11,14 +11,14 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_ackermann
 {
-DriveMotor::DriveMotor(const MotorFactoryPtr& motor_factory, ros::NodeHandle& private_nh, bool publish_motor_speed)
-  : motor_(motor_factory->createDriveMotor(private_nh)),
-    velocity_sent_publisher_(private_nh, "velocity_sent", publish_motor_speed),
-    velocity_received_publisher(private_nh, "velocity_received", publish_motor_speed)
+VescDriveMotor::VescDriveMotor(ros::NodeHandle& private_nh,
+                               const std::shared_ptr<vesc_motor::VescTransportFactory>& transport_factory,
+                               double control_interval)
+  : motor_(private_nh, transport_factory, control_interval)
 {
 }
 
-double DriveMotor::getPosition(const ros::Time& time)
+double VescDriveMotor::getPosition(const ros::Time& time)
 {
   if (time > last_velocity_time_)
   {
@@ -28,10 +28,9 @@ double DriveMotor::getPosition(const ros::Time& time)
   return last_position_;
 }
 
-double DriveMotor::getVelocity(const ros::Time& time)
+double VescDriveMotor::getVelocity(const ros::Time& time)
 {
-  const double velocity = motor_->getVelocity(time);
-  velocity_received_publisher.publish(velocity);
+  const double velocity = motor_.getVelocity(time);
 
   if (time > last_velocity_time_)
   {
@@ -48,19 +47,56 @@ double DriveMotor::getVelocity(const ros::Time& time)
   return velocity;
 }
 
-void DriveMotor::setVelocity(const double velocity)
+void VescDriveMotor::setVelocity(const double velocity)
 {
-  velocity_sent_publisher_.publish(velocity);
+  motor_.setVelocity(velocity);
+}
+
+void VescDriveMotor::brake(const double current)
+{
+  motor_.brake(current);
+}
+
+boost::optional<double> VescDriveMotor::getSupplyVoltage()
+{
+  return motor_.getSupplyVoltage();
+}
+
+PublishingDriveMotor::PublishingDriveMotor(ros::NodeHandle& private_nh, const DriveMotorPtr& motor)
+  : motor_(motor),
+    velocity_sent_publisher_(private_nh, "velocity_sent", true),
+    velocity_received_publisher_(private_nh, "velocity_received", true),
+    position_received_publisher_(private_nh, "position_received", true)
+{
+}
+
+double PublishingDriveMotor::getPosition(const ros::Time& time)
+{
+  const double position = motor_->getPosition(time);
+  position_received_publisher_.publish(position);
+  return position;
+}
+
+double PublishingDriveMotor::getVelocity(const ros::Time& time)
+{
+  const double velocity = motor_->getVelocity(time);
+  velocity_received_publisher_.publish(velocity);
+  return velocity;
+}
+
+void PublishingDriveMotor::setVelocity(const double velocity)
+{
   motor_->setVelocity(velocity);
+  velocity_sent_publisher_.publish(velocity);
 }
 
-void DriveMotor::brake(const double current)
+void PublishingDriveMotor::brake(const double current)
 {
-  velocity_sent_publisher_.publish(0.0);
   motor_->brake(current);
+  velocity_sent_publisher_.publish(0.0);
 }
 
-double DriveMotor::getSupplyVoltage()
+boost::optional<double> PublishingDriveMotor::getSupplyVoltage()
 {
   return motor_->getSupplyVoltage();
 }

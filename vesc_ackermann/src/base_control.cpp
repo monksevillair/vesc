@@ -6,7 +6,7 @@ All rights reserved.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <vesc_ackermann/vesc_ackermann.h>
+#include <vesc_ackermann/base_control.h>
 #include <angles/angles.h>
 #include <functional>
 #include <nav_msgs/Odometry.h>
@@ -16,53 +16,25 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_ackermann
 {
-VescAckermann::VescAckermann(const ros::NodeHandle& private_nh)
+BaseControl::BaseControl(const ros::NodeHandle& private_nh)
   : private_nh_(private_nh), reconfigure_server_(private_nh_)
 {
-  ROS_DEBUG_STREAM("VescAckermann::VescAckermann::4");
+  cmd_vel_twist_sub_ = private_nh_.subscribe("cmd_vel", 1, &BaseControl::processVelocityCommand, this);
+  cmd_vel_ackermann_sub_ = private_nh_.subscribe("cmd_vel_ackermann", 1, &BaseControl::processAckermannCommand, this);
 
-  cmd_vel_twist_sub_ = private_nh_.subscribe("cmd_vel", 1, &VescAckermann::processVelocityCommand, this);
-  cmd_vel_ackermann_sub_ = private_nh_.subscribe("cmd_vel_ackermann", 1, &VescAckermann::processAckermannCommand, this);
-
-  ROS_DEBUG_STREAM("VescAckermann::VescAckermann::7");
-
-  ROS_DEBUG_STREAM("VescAckermann::VescAckermann::1");
   reconfigure_server_.setCallback(
-    std::bind(&VescAckermann::reconfigure, this, std::placeholders::_1, std::placeholders::_2));
+    std::bind(&BaseControl::reconfigure, this, std::placeholders::_1));
 }
 
-void VescAckermann::reconfigure(AckermannConfig& config, uint32_t /*level*/)
+void BaseControl::reconfigure(BaseControlConfig& config)
 {
-  if (config.max_velocity_linear == 0.0)
-  {
-    ROS_ERROR("Parameter max_velocity_linear is not set");
-  }
-
-  if (config.allowed_brake_velocity == 0.0)
-  {
-    ROS_ERROR("Parameter allowed_brake_velocity is not set");
-  }
-
-  if (config.brake_velocity == 0.0)
-  {
-    ROS_ERROR("Parameter brake_velocity is not set");
-  }
-
-  if (config.brake_current == 0.0)
-  {
-    ROS_ERROR("Parameter brake_current is not set");
-  }
-
   config_ = config;
 
-  if (vehicle_)
+  if (!vehicle_)
   {
-    vehicle_->setCommonConfig(config_);
-  }
-  else
-  {
-    vehicle_.emplace(private_nh_, config_,
-                     std::make_shared<MotorFactory>(private_nh_, 1.0 / (config_.odometry_rate * 2.1)));
+    vehicle_.emplace(
+      ros::NodeHandle(private_nh_, "vehicle"),
+      std::make_shared<MotorFactory>(private_nh_, 1.0 / (config_.odometry_rate * 2.1), config_.publish_motor_states));
   }
 
   if (!odom_pub_ && config_.publish_odom)
@@ -103,12 +75,12 @@ void VescAckermann::reconfigure(AckermannConfig& config, uint32_t /*level*/)
 
   if (!odom_timer_)
   {
-    odom_timer_ = private_nh_.createTimer(ros::Duration(1.0 / config_.odometry_rate), &VescAckermann::odomTimerCB,
+    odom_timer_ = private_nh_.createTimer(ros::Duration(1.0 / config_.odometry_rate), &BaseControl::odomTimerCB,
                                           this);
   }
 }
 
-void VescAckermann::processVelocityCommand(const geometry_msgs::TwistConstPtr& cmd_vel)
+void BaseControl::processVelocityCommand(const geometry_msgs::TwistConstPtr& cmd_vel)
 {
   if (vehicle_)
   {
@@ -116,7 +88,7 @@ void VescAckermann::processVelocityCommand(const geometry_msgs::TwistConstPtr& c
   }
 }
 
-void VescAckermann::processAckermannCommand(const ackermann_msgs::AckermannDriveConstPtr& cmd_vel)
+void BaseControl::processAckermannCommand(const ackermann_msgs::AckermannDriveConstPtr& cmd_vel)
 {
   if (vehicle_)
   {
@@ -124,15 +96,11 @@ void VescAckermann::processAckermannCommand(const ackermann_msgs::AckermannDrive
   }
 }
 
-void VescAckermann::odomTimerCB(const ros::TimerEvent& event)
+void BaseControl::odomTimerCB(const ros::TimerEvent& event)
 {
-  ROS_DEBUG_STREAM("VescAckermann::odomTimerCB::1");
-
   if (vehicle_)
   {
-    ROS_DEBUG_STREAM("VescAckermann::odomTimerCB::2");
     updateOdometry(event.current_real);
-    ROS_DEBUG_STREAM("VescAckermann::odomTimerCB::3");
 
     if (config_.publish_odom || config_.publish_tf)
     {
@@ -149,11 +117,9 @@ void VescAckermann::odomTimerCB(const ros::TimerEvent& event)
       joint_states_pub_.publish(vehicle_->getJointStates(event.current_real));
     }
   }
-
-  ROS_DEBUG_STREAM("VescAckermann::odomTimerCB::4");
 }
 
-void VescAckermann::updateOdometry(const ros::Time& time)
+void BaseControl::updateOdometry(const ros::Time& time)
 {
   if (time >= odom_update_time_)
   {
@@ -179,7 +145,7 @@ void VescAckermann::updateOdometry(const ros::Time& time)
   }
 }
 
-void VescAckermann::publishOdometry()
+void BaseControl::publishOdometry()
 {
   if (!odom_update_time_.isZero())
   {
@@ -207,7 +173,7 @@ void VescAckermann::publishOdometry()
   }
 }
 
-void VescAckermann::publishSupplyVoltage()
+void BaseControl::publishSupplyVoltage()
 {
   const boost::optional<double> supply_voltage = vehicle_->getSupplyVoltage();
 

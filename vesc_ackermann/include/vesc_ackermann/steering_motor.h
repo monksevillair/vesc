@@ -9,6 +9,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #ifndef VESC_ACKERMANN_STEERING_MOTOR_H
 #define VESC_ACKERMANN_STEERING_MOTOR_H
 
+#include <boost/optional.hpp>
 #include <ros/node_handle.h>
 #include <ros/time.h>
 #include <std_msgs/Float64.h>
@@ -21,17 +22,48 @@ namespace vesc_ackermann
 class SteeringMotor
 {
 public:
-  SteeringMotor(const MotorFactoryPtr& motor_factory, ros::NodeHandle& private_nh, bool publish_motor_position);
+  virtual ~SteeringMotor() = default;
 
-  double getPosition(const ros::Time& time);
-  double getVelocity(const ros::Time& time);
+  virtual double getPosition(const ros::Time& time) = 0;
+  virtual double getVelocity(const ros::Time& time) = 0;
 
-  void setPosition(double position);
+  virtual void setPosition(double position) = 0;
 
-  double getSupplyVoltage();
+  virtual boost::optional<double> getSupplyVoltage() = 0;
+};
 
-private:
-  std::shared_ptr<vesc_motor::VescSteeringMotor> motor_;
+class VescSteeringMotor : public SteeringMotor
+{
+public:
+  VescSteeringMotor(ros::NodeHandle& private_nh,
+                    const std::shared_ptr<vesc_motor::VescTransportFactory>& transport_factory,
+                    double control_interval);
+
+  double getPosition(const ros::Time& time) override;
+  double getVelocity(const ros::Time& time) override;
+
+  void setPosition(double position) override;
+
+  boost::optional<double> getSupplyVoltage() override;
+
+protected:
+  vesc_motor::VescSteeringMotor motor_;
+};
+
+class PublishingSteeringMotor : public SteeringMotor
+{
+public:
+  PublishingSteeringMotor(ros::NodeHandle& private_nh, const SteeringMotorPtr& motor);
+
+  double getPosition(const ros::Time& time) override;
+  double getVelocity(const ros::Time& time) override;
+
+  void setPosition(double position) override;
+
+  boost::optional<double> getSupplyVoltage() override;
+
+protected:
+  SteeringMotorPtr motor_;
   OptionalDataPublisher<std_msgs::Float64> position_sent_publisher_;
   OptionalDataPublisher<std_msgs::Float64> position_received_publisher_;
   OptionalDataPublisher<std_msgs::Float64> velocity_received_publisher_;

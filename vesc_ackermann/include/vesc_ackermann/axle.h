@@ -16,12 +16,10 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <ros/node_handle.h>
 #include <ros/time.h>
 #include <sensor_msgs/JointState.h>
-#include <vesc_ackermann/AckermannConfig.h>
 #include <vesc_ackermann/AxleConfig.h>
-#include <vesc_ackermann/drive_motor.h>
 #include <vesc_ackermann/steering.h>
-#include <vesc_ackermann/steering_motor.h>
 #include <vesc_ackermann/types.h>
+#include <vesc_ackermann/VehicleConfig.h>
 #include <vesc_ackermann/wheel.h>
 
 namespace vesc_ackermann
@@ -29,10 +27,10 @@ namespace vesc_ackermann
 class Axle
 {
 public:
-  Axle(const ros::NodeHandle& nh, const AckermannConfig& common_config, const MotorFactoryPtr& motor_factory);
+  Axle(const ros::NodeHandle& nh, const VehicleConfig& vehicle_config, const MotorFactoryPtr& motor_factory);
 
   const AxleConfig& getConfig() const;
-  void setCommonConfig(const AckermannConfig& common_config);
+  void setVehicleConfig(const VehicleConfig& vehicle_config);
 
   void setVelocity(double linear_velocity, double angular_velocity, double axle_steering_angle, const ros::Time& time);
 
@@ -43,22 +41,22 @@ public:
   boost::optional<double> getSupplyVoltage();
 
 protected:
-  void reconfigure(AxleConfig& axle_config, uint32_t level);
+  void reconfigure(AxleConfig& config);
 
   ros::NodeHandle nh_;
   MotorFactoryPtr motor_factory_;
 
-  AckermannConfig common_config_;
-  boost::optional<AxleConfig> axle_config_;
-  dynamic_reconfigure::Server<AxleConfig> axle_config_server_;
+  VehicleConfig vehicle_config_;
+  boost::optional<AxleConfig> config_;
+  dynamic_reconfigure::Server<AxleConfig> reconfigure_server_;
 
   std::shared_ptr<IdealAckermannSteering> steering_;
   Wheel left_wheel_;
   Wheel right_wheel_;
 
-  boost::optional<SteeringMotor> steering_motor_;
-  boost::optional<DriveMotor> left_motor_;
-  boost::optional<DriveMotor> right_motor_;
+  SteeringMotorPtr steering_motor_;
+  DriveMotorPtr left_motor_;
+  DriveMotorPtr right_motor_;
 };
 }
 

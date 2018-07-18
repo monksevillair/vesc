@@ -41,8 +41,9 @@ find_package(Eigen3 REQUIRED)
 
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
 generate_dynamic_reconfigure_options(
-  cfg/Ackermann.cfg
   cfg/Axle.cfg
+  cfg/BaseControl.cfg
+  cfg/Vehicle.cfg
 )
 
 ###################################
@@ -80,6 +81,7 @@ include_directories(
 ## Declare a C++ library
 add_library(${PROJECT_NAME}
   src/axle.cpp include/vesc_ackermann/axle.h
+  src/base_control.cpp include/vesc_ackermann/base_control.h
   src/drive_motor.cpp include/vesc_ackermann/drive_motor.h
   include/vesc_ackermann/optional_data_publisher.h
   src/steering.cpp include/vesc_ackermann/steering.h
@@ -87,7 +89,6 @@ add_library(${PROJECT_NAME}
   include/vesc_ackermann/types.h
   src/utils.cpp include/vesc_ackermann/utils.h
   src/vehicle.cpp include/vesc_ackermann/vehicle.h
-  src/vesc_ackermann.cpp include/vesc_ackermann/vesc_ackermann.h
   src/wheel.cpp include/vesc_ackermann/wheel.h
   src/motor_factory.cpp include/vesc_ackermann/motor_factory.h
 )
@@ -109,7 +110,7 @@ add_dependencies(${PROJECT_NAME}
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(${PROJECT_NAME}_node
-  src/vesc_ackermann_node.cpp
+  src/base_control_node.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}_node

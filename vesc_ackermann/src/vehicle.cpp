@@ -4,6 +4,9 @@
 #include <vesc_ackermann/vehicle.h>
 #include <Eigen/Core>
 #include <Eigen/QR>
+#include <functional>
+#include <memory>
+#include <vesc_ackermann/axle.h>
 #include <vesc_ackermann/utils.h>
 
 namespace vesc_ackermann
@@ -13,42 +16,85 @@ VehicleVelocityConstraint::VehicleVelocityConstraint(double a_v_x_, double a_v_y
 {
 }
 
-Vehicle::Vehicle(const ros::NodeHandle& nh, const AckermannConfig& common_config,
-                 const MotorFactoryPtr& motor_factory)
-  : front_axle_(ros::NodeHandle(nh, "front_axle"), common_config, motor_factory),
-    rear_axle_(ros::NodeHandle(nh, "rear_axle"), common_config, motor_factory)
+Vehicle::Vehicle(const ros::NodeHandle& nh, const MotorFactoryPtr& motor_factory)
+  : nh_(nh), motor_factory_(motor_factory), reconfigure_server_(nh)
 {
-  axles_.at(0) = &front_axle_;
-  axles_.at(1) = &rear_axle_;
-  setCommonConfig(common_config);
+  reconfigure_server_.setCallback(std::bind(&Vehicle::reconfigure, this, std::placeholders::_1));
 }
 
-void Vehicle::setCommonConfig(const AckermannConfig& common_config)
+void Vehicle::reconfigure(VehicleConfig& config)
 {
-  common_config_ = common_config;
+  config_ = config;
 
-  const AxleConfig& front_axle_config = front_axle_.getConfig();
-  const AxleConfig& rear_axle_config = rear_axle_.getConfig();
+  if (config.max_velocity_linear == 0.0)
+  {
+    ROS_ERROR("Parameter max_velocity_linear is not set");
+  }
 
-  if (front_axle_config.is_steered)
+  if (config.allowed_brake_velocity == 0.0)
   {
-    wheelbase_ = std::fabs(front_axle_config.position_x - front_axle_config.steering_icr_x);
+    ROS_WARN("Parameter allowed_brake_velocity is not set");
   }
-  else if (rear_axle_config.is_steered)
+
+  if (config.brake_velocity == 0.0)
   {
-    wheelbase_ = std::fabs(rear_axle_config.position_x - rear_axle_config.steering_icr_x);
+    ROS_WARN("Parameter brake_velocity is not set");
   }
-  else
+
+  if (config.brake_current == 0.0)
   {
-    ROS_ERROR_STREAM("Neither front nor rear axle is steered, this doesn't make much sense");
-    // Despite this configuration makes little sense, set wheelbase to something sensible:
-    wheelbase_ = std::fabs(front_axle_config.position_x - rear_axle_config.position_x);
+    ROS_WARN("Parameter brake_current is not set");
+  }
+
+  if (axles_.empty())
+  {
+    XmlRpc::XmlRpcValue axles_param;
+    if (nh_.getParam("axles", axles_param))
+    {
+      if (axles_param.getType() == XmlRpc::XmlRpcValue::TypeStruct)
+      {
+        const ros::NodeHandle axles_nh(nh_, "axles");
+        for (const XmlRpc::XmlRpcValue::ValueStruct::value_type& axle_param : axles_param)
+        {
+          axles_.emplace_back(
+            std::make_shared<Axle>(ros::NodeHandle(axles_nh, axle_param.first), config_, motor_factory_));
+        }
+      }
+      else
+      {
+        ROS_ERROR_STREAM("axles parameter has invalid type, must be map");
+      }
+    }
+    else
+    {
+      ROS_ERROR_STREAM("axles parameter is missing");
+    }
+  }
+
+  wheelbase_ = 0.0;
+  for (const AxlePtr& axle : axles_)
+  {
+    const AxleConfig& axle_config = axle->getConfig();
+
+    if (axle_config.is_steered)
+    {
+      wheelbase_ = std::fabs(axle_config.position_x - axle_config.steering_icr_x);
+      if (wheelbase_ != 0.0)
+      {
+        break;
+      }
+    }
+  }
+
+  if (wheelbase_ == 0.0)
+  {
+    ROS_WARN_STREAM("Could not automatically determine wheelbase, this prevents control via Ackermann messages");
   }
 
   max_steering_angle_ = M_PI_2;
-  for (Axle* const axle : axles_)
+  for (const AxlePtr& axle : axles_)
   {
-    axle->setCommonConfig(common_config_);
+    axle->setVehicleConfig(config_);
 
     const AxleConfig& axle_config = axle->getConfig();
 
@@ -73,16 +119,16 @@ void Vehicle::setVelocity(const ackermann_msgs::AckermannDrive& velocity, const 
   // (angular_velocity = tan(steering_angle) * linear_velocity / wheelbase; this can become infinite when
   // steering_angle approaches 90 degrees):
   double angular_velocity = 0.0;
-  double linear_velocity = std::min(std::max<double>(-common_config_.max_velocity_linear, velocity.speed),
-                                    common_config_.max_velocity_linear);
-  if (linear_velocity != 0.0)
+  double linear_velocity = std::min(std::max<double>(-config_.max_velocity_linear, velocity.speed),
+                                    config_.max_velocity_linear);
+  if (linear_velocity != 0.0 && wheelbase_ != 0.0)
   {
     const double a = std::fabs(linear_velocity * sin_steering_angle);
-    const double b = std::fabs(common_config_.max_velocity_angular * wheelbase_ * cos_steering_angle);
+    const double b = std::fabs(config_.max_velocity_angular * wheelbase_ * cos_steering_angle);
     if (a > b)
     {
       linear_velocity *= b / a;
-      angular_velocity = common_config_.max_velocity_angular * (linear_velocity < 0.0 ? -1.0 : 1.0)
+      angular_velocity = config_.max_velocity_angular * (linear_velocity < 0.0 ? -1.0 : 1.0)
         * (steering_angle < 0.0 ? -1.0 : 1.0);
     }
     else
@@ -91,7 +137,7 @@ void Vehicle::setVelocity(const ackermann_msgs::AckermannDrive& velocity, const 
     }
   }
 
-  for (Axle* const axle : axles_)
+  for (const AxlePtr& axle : axles_)
   {
     const AxleConfig& axle_config = axle->getConfig();
 
@@ -108,10 +154,10 @@ void Vehicle::setVelocity(const ackermann_msgs::AckermannDrive& velocity, const 
 
 void Vehicle::setVelocity(const geometry_msgs::Twist& velocity, const ros::Time& time)
 {
-  const double linear_velocity = std::min(std::max(-common_config_.max_velocity_linear, velocity.linear.x),
-                                          common_config_.max_velocity_linear);
-  double angular_velocity = std::min(std::max(-common_config_.max_velocity_angular, velocity.angular.z),
-                                     common_config_.max_velocity_angular);
+  const double linear_velocity = std::min(std::max(-config_.max_velocity_linear, velocity.linear.x),
+                                          config_.max_velocity_linear);
+  double angular_velocity = std::min(std::max(-config_.max_velocity_angular, velocity.angular.z),
+                                     config_.max_velocity_angular);
 
   if (angular_velocity != 0)
   {
@@ -123,11 +169,16 @@ void Vehicle::setVelocity(const geometry_msgs::Twist& velocity, const ros::Time&
     }
   }
 
-  for (Axle* const axle : axles_)
+  for (const AxlePtr& axle : axles_)
   {
     const AxleConfig& axle_config = axle->getConfig();
-    const double axle_steering_angle
-      = std::atan2((axle_config.position_x - axle_config.steering_icr_x) * angular_velocity, linear_velocity);
+
+    double axle_steering_angle = 0.0;
+    if (axle_config.is_steered)
+    {
+      axle_steering_angle = normalizeSteeringAngle(
+        std::atan2((axle_config.position_x - axle_config.steering_icr_x) * angular_velocity, linear_velocity));
+    }
 
     axle->setVelocity(linear_velocity, angular_velocity, axle_steering_angle, time);
   }
@@ -137,7 +188,7 @@ geometry_msgs::Twist Vehicle::getVelocity(const ros::Time& time)
 {
   // Compute vehicle velocity using pseudo inverse of velocity constraints:
   VehicleVelocityConstraints constraints;
-  for (Axle* const axle : axles_)
+  for (const AxlePtr& axle : axles_)
   {
     axle->getVelocityConstraints(time, constraints);
   }
@@ -165,7 +216,7 @@ sensor_msgs::JointState Vehicle::getJointStates(const ros::Time& time)
 {
   sensor_msgs::JointState joint_states;
   joint_states.header.stamp = time;
-  for (Axle* const axle : axles_)
+  for (const AxlePtr& axle : axles_)
   {
     axle->getJointStates(time, joint_states);
   }
@@ -177,7 +228,7 @@ boost::optional<double> Vehicle::getSupplyVoltage()
   double supply_voltage = 0.0;
   int num_measurements = 0;
 
-  for (Axle* const axle : axles_)
+  for (const AxlePtr& axle : axles_)
   {
     const boost::optional<double> axle_supply_voltage = axle->getSupplyVoltage();
     if (axle_supply_voltage)
