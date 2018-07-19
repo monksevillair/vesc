@@ -1,14 +1,14 @@
 //
 // Created by abuchegger on 05.07.18.
 //
-#include <vesc_ackermann/wheel.h>
+#include <arti_base_control/wheel.h>
 #include <angles/angles.h>
+#include <arti_base_control/steering.h>
+#include <arti_base_control/vehicle.h>
 #include <cmath>
 #include <stdexcept>
-#include <vesc_ackermann/steering.h>
-#include <vesc_ackermann/vehicle.h>
 
-namespace vesc_ackermann
+namespace arti_base_control
 {
 Wheel::Wheel(const double position_x, const double position_y, const double hinge_position_y, const double radius,
              const SteeringConstPtr& steering)

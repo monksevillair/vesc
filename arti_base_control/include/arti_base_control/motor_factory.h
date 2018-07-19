@@ -1,14 +1,14 @@
 //
 // Created by abuchegger on 10.07.18.
 //
-#ifndef VESC_ACKERMANN_MOTOR_FACTORY_H
-#define VESC_ACKERMANN_MOTOR_FACTORY_H
+#ifndef ARTI_BASE_CONTROL_MOTOR_FACTORY_H
+#define ARTI_BASE_CONTROL_MOTOR_FACTORY_H
 
+#include <arti_base_control/types.h>
 #include <ros/node_handle.h>
-#include <vesc_ackermann/types.h>
 #include <vesc_motor/types.h>
 
-namespace vesc_ackermann
+namespace arti_base_control
 {
 class MotorFactory
 {
@@ -25,4 +25,4 @@ protected:
 };
 }
 
-#endif //VESC_ACKERMANN_MOTOR_FACTORY_H
+#endif //ARTI_BASE_CONTROL_MOTOR_FACTORY_H

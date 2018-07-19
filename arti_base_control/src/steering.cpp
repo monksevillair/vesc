@@ -1,12 +1,12 @@
 //
 // Created by abuchegger on 09.07.18.
 //
-#include <vesc_ackermann/steering.h>
+#include <arti_base_control/steering.h>
+#include <arti_base_control/utils.h>
+#include <arti_base_control/wheel.h>
 #include <cmath>
-#include <vesc_ackermann/utils.h>
-#include <vesc_ackermann/wheel.h>
 
-namespace vesc_ackermann
+namespace arti_base_control
 {
 IdealAckermannSteering::IdealAckermannSteering(double icr_x)
   : icr_x_(icr_x)

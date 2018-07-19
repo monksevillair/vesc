@@ -1,12 +1,12 @@
 //
 // Created by abuchegger on 09.07.18.
 //
-#ifndef VESC_ACKERMANN_STEERING_H
-#define VESC_ACKERMANN_STEERING_H
+#ifndef ARTI_BASE_CONTROL_STEERING_H
+#define ARTI_BASE_CONTROL_STEERING_H
 
-#include <vesc_ackermann/types.h>
+#include <arti_base_control/types.h>
 
-namespace vesc_ackermann
+namespace arti_base_control
 {
 /**
  * Representation of the steering geometry for one or more wheels.
@@ -41,4 +41,4 @@ public:
 };
 }
 
-#endif //VESC_ACKERMANN_STEERING_H
+#endif //ARTI_BASE_CONTROL_STEERING_H

@@ -6,23 +6,23 @@ All rights reserved.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef VESC_ACKERMANN_AXLE_H
-#define VESC_ACKERMANN_AXLE_H
+#ifndef ARTI_BASE_CONTROL_AXLE_H
+#define ARTI_BASE_CONTROL_AXLE_H
 
 #include <ackermann_msgs/AckermannDrive.h>
+#include <arti_base_control/AxleConfig.h>
+#include <arti_base_control/steering.h>
+#include <arti_base_control/types.h>
+#include <arti_base_control/VehicleConfig.h>
+#include <arti_base_control/wheel.h>
 #include <boost/optional.hpp>
 #include <dynamic_reconfigure/server.h>
 #include <memory>
 #include <ros/node_handle.h>
 #include <ros/time.h>
 #include <sensor_msgs/JointState.h>
-#include <vesc_ackermann/AxleConfig.h>
-#include <vesc_ackermann/steering.h>
-#include <vesc_ackermann/types.h>
-#include <vesc_ackermann/VehicleConfig.h>
-#include <vesc_ackermann/wheel.h>
 
-namespace vesc_ackermann
+namespace arti_base_control
 {
 class Axle
 {
@@ -60,4 +60,4 @@ protected:
 };
 }
 
-#endif //VESC_ACKERMANN_AXLE_H
+#endif //ARTI_BASE_CONTROL_AXLE_H

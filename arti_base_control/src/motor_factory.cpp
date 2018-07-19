@@ -1,13 +1,13 @@
 //
 // Created by abuchegger on 10.07.18.
 //
-#include <vesc_ackermann/motor_factory.h>
-#include <vesc_ackermann/drive_motor.h>
-#include <vesc_ackermann/steering_motor.h>
+#include <arti_base_control/motor_factory.h>
+#include <arti_base_control/drive_motor.h>
+#include <arti_base_control/steering_motor.h>
 #include <vesc_motor/driver_factory.h>
 #include <vesc_motor/transport_factory.h>
 
-namespace vesc_ackermann
+namespace arti_base_control
 {
 MotorFactory::MotorFactory(const ros::NodeHandle& nh, double control_interval, bool publish_motor_states,
                            bool use_mockup)

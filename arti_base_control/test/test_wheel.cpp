@@ -4,12 +4,12 @@
 #include <gtest/gtest.h>
 #include <cmath>
 #include <memory>
-#include <vesc_ackermann/steering.h>
-#include <vesc_ackermann/wheel.h>
+#include <arti_base_control/steering.h>
+#include <arti_base_control/wheel.h>
 
 TEST(WheelTest, SimpleFrontWheelTest)
 {
-  const vesc_ackermann::Wheel wheel(1.0, 0.0, 0.0, 0.5, std::make_shared<vesc_ackermann::IdealAckermannSteering>(0.0));
+  const arti_base_control::Wheel wheel(1.0, 0.0, 0.0, 0.5, std::make_shared<arti_base_control::IdealAckermannSteering>(0.0));
   EXPECT_DOUBLE_EQ(2.0, wheel.computeWheelVelocity(1.0, 0.0, 0.0, 0.0));
   EXPECT_DOUBLE_EQ(2.0 * std::sqrt(2.0), wheel.computeWheelVelocity(1.0, 1.0, 0.0, 0.0));
   EXPECT_DOUBLE_EQ(2.0 * std::sqrt(2.0), wheel.computeWheelVelocity(1.0, -1.0, 0.0, 0.0));

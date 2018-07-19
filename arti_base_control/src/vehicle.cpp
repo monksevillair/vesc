@@ -1,15 +1,15 @@
 //
 // Created by abuchegger on 06.07.18.
 //
-#include <vesc_ackermann/vehicle.h>
+#include <arti_base_control/vehicle.h>
+#include <arti_base_control/axle.h>
+#include <arti_base_control/utils.h>
 #include <Eigen/Core>
 #include <Eigen/QR>
 #include <functional>
 #include <memory>
-#include <vesc_ackermann/axle.h>
-#include <vesc_ackermann/utils.h>
 
-namespace vesc_ackermann
+namespace arti_base_control
 {
 VehicleVelocityConstraint::VehicleVelocityConstraint(double a_v_x_, double a_v_y_, double a_v_theta_, double b_)
   : a_v_x(a_v_x_), a_v_y(a_v_y_), a_v_theta(a_v_theta_), b(b_)

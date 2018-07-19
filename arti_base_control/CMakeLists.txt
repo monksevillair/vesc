@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(vesc_ackermann)
+project(arti_base_control)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -80,16 +80,16 @@ include_directories(
 
 ## Declare a C++ library
 add_library(${PROJECT_NAME}
-  src/axle.cpp include/vesc_ackermann/axle.h
-  src/base_control.cpp include/vesc_ackermann/base_control.h
-  src/drive_motor.cpp include/vesc_ackermann/drive_motor.h
-  src/motor_factory.cpp include/vesc_ackermann/motor_factory.h
-  src/steering.cpp include/vesc_ackermann/steering.h
-  src/steering_motor.cpp include/vesc_ackermann/steering_motor.h
-  include/vesc_ackermann/types.h
-  src/utils.cpp include/vesc_ackermann/utils.h
-  src/vehicle.cpp include/vesc_ackermann/vehicle.h
-  src/wheel.cpp include/vesc_ackermann/wheel.h
+  src/axle.cpp include/arti_base_control/axle.h
+  src/base_control.cpp include/arti_base_control/base_control.h
+  src/drive_motor.cpp include/arti_base_control/drive_motor.h
+  src/motor_factory.cpp include/arti_base_control/motor_factory.h
+  src/steering.cpp include/arti_base_control/steering.h
+  src/steering_motor.cpp include/arti_base_control/steering_motor.h
+  include/arti_base_control/types.h
+  src/utils.cpp include/arti_base_control/utils.h
+  src/vehicle.cpp include/arti_base_control/vehicle.h
+  src/wheel.cpp include/arti_base_control/wheel.h
 )
 
 target_link_libraries(${PROJECT_NAME}

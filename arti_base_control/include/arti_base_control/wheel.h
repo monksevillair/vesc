@@ -1,13 +1,13 @@
 //
 // Created by abuchegger on 05.07.18.
 //
-#ifndef VESC_ACKERMANN_WHEEL_H
-#define VESC_ACKERMANN_WHEEL_H
+#ifndef ARTI_BASE_CONTROL_WHEEL_H
+#define ARTI_BASE_CONTROL_WHEEL_H
 
+#include <arti_base_control/types.h>
 #include <boost/optional.hpp>
-#include <vesc_ackermann/types.h>
 
-namespace vesc_ackermann
+namespace arti_base_control
 {
 /**
  * Representation of a wheel's and its steering hinge's geometry.
@@ -49,4 +49,4 @@ public:
 };
 }
 
-#endif //VESC_ACKERMANN_WHEEL_H
+#endif //ARTI_BASE_CONTROL_WHEEL_H

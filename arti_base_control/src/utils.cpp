@@ -1,10 +1,10 @@
 //
 // Created by abuchegger on 13.07.18.
 //
-#include <vesc_ackermann/utils.h>
+#include <arti_base_control/utils.h>
 #include <angles/angles.h>
 
-namespace vesc_ackermann
+namespace arti_base_control
 {
 
 double normalizeSteeringAngle(const double steering_angle)

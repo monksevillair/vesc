@@ -6,14 +6,14 @@ All rights reserved.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <vesc_ackermann/axle.h>
-#include <vesc_ackermann/drive_motor.h>
-#include <vesc_ackermann/motor_factory.h>
-#include <vesc_ackermann/steering_motor.h>
-#include <vesc_ackermann/utils.h>
-#include <vesc_ackermann/vehicle.h>
+#include <arti_base_control/axle.h>
+#include <arti_base_control/drive_motor.h>
+#include <arti_base_control/motor_factory.h>
+#include <arti_base_control/steering_motor.h>
+#include <arti_base_control/utils.h>
+#include <arti_base_control/vehicle.h>
 
-namespace vesc_ackermann
+namespace arti_base_control
 {
 Axle::Axle(const ros::NodeHandle& nh, const VehicleConfig& vehicle_config, const MotorFactoryPtr& motor_factory)
   : nh_(nh), motor_factory_(motor_factory), vehicle_config_(vehicle_config), reconfigure_server_(nh),
@@ -130,16 +130,11 @@ void Axle::setVelocity(const double linear_velocity, const double angular_veloci
       && (std::fabs(left_motor_->getVelocity(time)) <= vehicle_config_.allowed_brake_velocity)
       && (std::fabs(right_motor_->getVelocity(time)) <= vehicle_config_.allowed_brake_velocity))
     {
-      ROS_DEBUG_STREAM("VescDifferentialDrive::processAckermannCommand::7");
-
-      ROS_DEBUG_STREAM("brake due to left_velocity: " << left_velocity << ", right_velocity: " << right_velocity);
       left_motor_->brake(vehicle_config_.brake_current);
       right_motor_->brake(vehicle_config_.brake_current);
     }
     else
     {
-      ROS_DEBUG_STREAM("VescDifferentialDrive::processAckermannCommand::8");
-
       left_motor_->setVelocity(left_velocity);
       right_motor_->setVelocity(right_velocity);
     }

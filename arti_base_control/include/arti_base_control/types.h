@@ -1,13 +1,13 @@
 //
 // Created by abuchegger on 09.07.18.
 //
-#ifndef VESC_ACKERMANN_TYPES_H
-#define VESC_ACKERMANN_TYPES_H
+#ifndef ARTI_BASE_CONTROL_TYPES_H
+#define ARTI_BASE_CONTROL_TYPES_H
 
 #include <memory>
 #include <vector>
 
-namespace vesc_ackermann
+namespace arti_base_control
 {
 class Axle;
 
@@ -37,4 +37,4 @@ class Wheel;
 
 }
 
-#endif //VESC_ACKERMANN_TYPES_H
+#endif //ARTI_BASE_CONTROL_TYPES_H

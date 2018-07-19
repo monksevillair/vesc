@@ -1,12 +1,12 @@
 //
 // Created by abuchegger on 13.07.18.
 //
-#ifndef VESC_ACKERMANN_UTILS_H
-#define VESC_ACKERMANN_UTILS_H
+#ifndef ARTI_BASE_CONTROL_UTILS_H
+#define ARTI_BASE_CONTROL_UTILS_H
 
 #include <ros/publisher.h>
 
-namespace vesc_ackermann
+namespace arti_base_control
 {
 
 double normalizeSteeringAngle(double steering_angle);
@@ -21,4 +21,4 @@ void publishData(ros::Publisher& publisher, const typename M::_data_type& data)
 
 }
 
-#endif //VESC_ACKERMANN_UTILS_H
+#endif //ARTI_BASE_CONTROL_UTILS_H

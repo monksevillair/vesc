@@ -1,10 +1,12 @@
 //
 // Created by abuchegger on 06.07.18.
 //
-#ifndef VESC_ACKERMANN_VEHICLE_H
-#define VESC_ACKERMANN_VEHICLE_H
+#ifndef ARTI_BASE_CONTROL_VEHICLE_H
+#define ARTI_BASE_CONTROL_VEHICLE_H
 
 #include <ackermann_msgs/AckermannDrive.h>
+#include <arti_base_control/types.h>
+#include <arti_base_control/VehicleConfig.h>
 #include <boost/optional.hpp>
 #include <dynamic_reconfigure/server.h>
 #include <geometry_msgs/Twist.h>
@@ -12,10 +14,8 @@
 #include <ros/time.h>
 #include <sensor_msgs/JointState.h>
 #include <vector>
-#include <vesc_ackermann/types.h>
-#include <vesc_ackermann/VehicleConfig.h>
 
-namespace vesc_ackermann
+namespace arti_base_control
 {
 struct VehicleVelocityConstraint
 {
@@ -55,4 +55,4 @@ protected:
 };
 }
 
-#endif //VESC_ACKERMANN_VEHICLE_H
+#endif //ARTI_BASE_CONTROL_VEHICLE_H

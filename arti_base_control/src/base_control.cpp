@@ -6,21 +6,21 @@ All rights reserved.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <vesc_ackermann/base_control.h>
+#include <arti_base_control/base_control.h>
 #include <angles/angles.h>
+#include <arti_base_control/motor_factory.h>
 #include <functional>
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/JointState.h>
 #include <std_msgs/Float32.h>
-#include <vesc_ackermann/motor_factory.h>
 
-namespace vesc_ackermann
+namespace arti_base_control
 {
 BaseControl::BaseControl(const ros::NodeHandle& private_nh)
   : private_nh_(private_nh), reconfigure_server_(private_nh_)
 {
   cmd_vel_twist_sub_ = private_nh_.subscribe("cmd_vel", 1, &BaseControl::processVelocityCommand, this);
-  cmd_vel_ackermann_sub_ = private_nh_.subscribe("cmd_vel_ackermann", 1, &BaseControl::processAckermannCommand, this);
+  cmd_ackermann_sub_ = private_nh_.subscribe("cmd_ackermann", 1, &BaseControl::processAckermannCommand, this);
 
   reconfigure_server_.setCallback(
     std::bind(&BaseControl::reconfigure, this, std::placeholders::_1));
@@ -89,11 +89,11 @@ void BaseControl::processVelocityCommand(const geometry_msgs::TwistConstPtr& cmd
   }
 }
 
-void BaseControl::processAckermannCommand(const ackermann_msgs::AckermannDriveConstPtr& cmd_vel)
+void BaseControl::processAckermannCommand(const ackermann_msgs::AckermannDriveConstPtr& cmd_ackermann)
 {
   if (vehicle_)
   {
-    vehicle_->setVelocity(*cmd_vel, ros::Time::now());
+    vehicle_->setVelocity(*cmd_ackermann, ros::Time::now());
   }
 }
 
