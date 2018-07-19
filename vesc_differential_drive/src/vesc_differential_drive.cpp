@@ -12,18 +12,21 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <functional>
 #include <nav_msgs/Odometry.h>
 #include <std_msgs/Float32.h>
+#include <vesc_motor/driver_factory.h>
+#include <vesc_motor/transport_factory.h>
 
 namespace vesc_differential_drive
 {
 VescDifferentialDrive::VescDifferentialDrive(ros::NodeHandle private_nh, const ros::NodeHandle& left_motor_private_nh,
                                              const ros::NodeHandle& right_motor_private_nh)
   : private_nh_(private_nh), reconfigure_server_(private_nh_),
-    transport_factory_(new vesc_motor::VescTransportFactory(private_nh_)),
     left_motor_private_nh_(left_motor_private_nh), right_motor_private_nh_(right_motor_private_nh)
 {
   ROS_DEBUG_STREAM("VescDifferentialDrive::VescDifferentialDrive::1");
-  reconfigure_server_.setCallback(
-    std::bind(&VescDifferentialDrive::reconfigure, this, std::placeholders::_1, std::placeholders::_2));
+  driver_factory_ = std::make_shared<vesc_motor::DriverFactory>(
+    std::make_shared<vesc_motor::TransportFactory>(private_nh_), false);
+
+  reconfigure_server_.setCallback(std::bind(&VescDifferentialDrive::reconfigure, this, std::placeholders::_1));
   ROS_DEBUG_STREAM("VescDifferentialDrive::VescDifferentialDrive::3");
 
   if (config_.publish_odom)
@@ -66,7 +69,7 @@ VescDifferentialDrive::VescDifferentialDrive(ros::NodeHandle private_nh, const r
   initialized_ = true;
 }
 
-void VescDifferentialDrive::reconfigure(DifferentialDriveConfig& config, uint32_t /*level*/)
+void VescDifferentialDrive::reconfigure(DifferentialDriveConfig& config)
 {
   if (config.max_velocity_linear == 0.0)
   {
@@ -108,12 +111,14 @@ void VescDifferentialDrive::reconfigure(DifferentialDriveConfig& config, uint32_
   // Motors are created when the config is set for the first time (happens when reconfigure callback is set):
   if (!left_motor_)
   {
-    left_motor_.emplace(left_motor_private_nh_, transport_factory_, 1.0 / (config_.odometry_rate * 2.1));
+    left_motor_.emplace(left_motor_private_nh_, driver_factory_,
+                        std::chrono::duration<double>(1.0 / (config_.odometry_rate * 2.1)));
   }
 
   if (!right_motor_)
   {
-    right_motor_.emplace(right_motor_private_nh_, transport_factory_, 1.0 / (config_.odometry_rate * 2.1));
+    right_motor_.emplace(right_motor_private_nh_, driver_factory_,
+                         std::chrono::duration<double>(1.0 / (config_.odometry_rate * 2.1)));
   }
 }
 

@@ -71,24 +71,28 @@ void Vehicle::reconfigure(VehicleConfig& config)
     }
   }
 
-  wheelbase_ = 0.0;
-  for (const AxlePtr& axle : axles_)
-  {
-    const AxleConfig& axle_config = axle->getConfig();
-
-    if (axle_config.is_steered)
-    {
-      wheelbase_ = std::fabs(axle_config.position_x - axle_config.steering_icr_x);
-      if (wheelbase_ != 0.0)
-      {
-        break;
-      }
-    }
-  }
-
+  wheelbase_ = config_.wheelbase;
   if (wheelbase_ == 0.0)
   {
-    ROS_WARN_STREAM("Could not automatically determine wheelbase, this prevents control via Ackermann messages");
+    for (const AxlePtr& axle : axles_)
+    {
+      const AxleConfig& axle_config = axle->getConfig();
+
+      if (axle_config.is_steered)
+      {
+        wheelbase_ = std::fabs(axle_config.position_x - axle_config.steering_icr_x);
+        if (wheelbase_ != 0.0)
+        {
+          break;
+        }
+      }
+    }
+
+    if (wheelbase_ == 0.0)
+    {
+      ROS_WARN_STREAM("Wheelbase is not set and could not be determined automatically, this prevents control via"
+                        " Ackermann messages");
+    }
   }
 
   max_steering_angle_ = M_PI_2;
@@ -98,11 +102,11 @@ void Vehicle::reconfigure(VehicleConfig& config)
 
     const AxleConfig& axle_config = axle->getConfig();
 
-    if (axle_config.is_steered && axle_config.steering_angle_max > 0.0)
+    if (axle_config.is_steered)
     {
-      const double max_steering_angle = normalizeSteeringAngle(std::atan2(
+      const double max_steering_angle = std::fabs(normalizeSteeringAngle(std::atan2(
         std::sin(axle_config.steering_angle_max) * wheelbase_,
-        std::cos(axle_config.steering_angle_max) * (axle_config.position_x - axle_config.steering_icr_x)));
+        std::cos(axle_config.steering_angle_max) * (axle_config.position_x - axle_config.steering_icr_x))));
 
       max_steering_angle_ = std::min(max_steering_angle_, max_steering_angle);
     }
@@ -111,7 +115,7 @@ void Vehicle::reconfigure(VehicleConfig& config)
 
 void Vehicle::setVelocity(const ackermann_msgs::AckermannDrive& velocity, const ros::Time& time)
 {
-  const double steering_angle = limitSteeringAngle(velocity.steering_angle);
+  const double steering_angle = limit(normalizeSteeringAngle(velocity.steering_angle), max_steering_angle_);
   const double sin_steering_angle = std::sin(steering_angle);
   const double cos_steering_angle = std::cos(steering_angle);
 
@@ -119,8 +123,7 @@ void Vehicle::setVelocity(const ackermann_msgs::AckermannDrive& velocity, const 
   // (angular_velocity = tan(steering_angle) * linear_velocity / wheelbase; this can become infinite when
   // steering_angle approaches 90 degrees):
   double angular_velocity = 0.0;
-  double linear_velocity = std::min(std::max<double>(-config_.max_velocity_linear, velocity.speed),
-                                    config_.max_velocity_linear);
+  double linear_velocity = limit(velocity.speed, config_.max_velocity_linear);
   if (linear_velocity != 0.0 && wheelbase_ != 0.0)
   {
     const double a = std::fabs(linear_velocity * sin_steering_angle);
@@ -154,10 +157,8 @@ void Vehicle::setVelocity(const ackermann_msgs::AckermannDrive& velocity, const 
 
 void Vehicle::setVelocity(const geometry_msgs::Twist& velocity, const ros::Time& time)
 {
-  const double linear_velocity = std::min(std::max(-config_.max_velocity_linear, velocity.linear.x),
-                                          config_.max_velocity_linear);
-  double angular_velocity = std::min(std::max(-config_.max_velocity_angular, velocity.angular.z),
-                                     config_.max_velocity_angular);
+  const double linear_velocity = limit(velocity.linear.x, config_.max_velocity_linear);
+  double angular_velocity = limit(velocity.angular.z, config_.max_velocity_angular);
 
   if (angular_velocity != 0)
   {
@@ -246,8 +247,8 @@ boost::optional<double> Vehicle::getSupplyVoltage()
   return boost::none;
 }
 
-double Vehicle::limitSteeringAngle(const double steering_angle) const
+double Vehicle::limit(const double value, const double max)
 {
-  return std::max(-max_steering_angle_, std::min(normalizeSteeringAngle(steering_angle), max_steering_angle_));
+  return std::min(std::max(-max, value), max);
 }
 }

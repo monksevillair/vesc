@@ -15,8 +15,8 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <geometry_msgs/Twist.h>
 #include <tf/transform_broadcaster.h>
 #include <vesc_differential_drive/DifferentialDriveConfig.h>
+#include <vesc_motor/types.h>
 #include <vesc_motor/vesc_drive_motor.h>
-#include <vesc_motor/vesc_transport_factory.h>
 
 namespace vesc_differential_drive
 {
@@ -27,7 +27,7 @@ public:
                         const ros::NodeHandle &left_motor_private_nh, const ros::NodeHandle &right_motor_private_nh);
 
 private:
-  void reconfigure(DifferentialDriveConfig& config, uint32_t level);
+  void reconfigure(DifferentialDriveConfig& config);
   void commandVelocityCB(const geometry_msgs::Twist &cmd_vel);
   void odomTimerCB(const ros::TimerEvent& event);
   void updateOdometry(const ros::Time &time);
@@ -42,7 +42,7 @@ private:
   dynamic_reconfigure::Server<DifferentialDriveConfig> reconfigure_server_;
   DifferentialDriveConfig config_;
 
-  std::shared_ptr<vesc_motor::VescTransportFactory> transport_factory_;
+  vesc_motor::DriverFactoryPtr driver_factory_;
 
   ros::NodeHandle left_motor_private_nh_;
   boost::optional<vesc_motor::VescDriveMotor> left_motor_;

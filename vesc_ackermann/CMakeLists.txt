@@ -83,14 +83,13 @@ add_library(${PROJECT_NAME}
   src/axle.cpp include/vesc_ackermann/axle.h
   src/base_control.cpp include/vesc_ackermann/base_control.h
   src/drive_motor.cpp include/vesc_ackermann/drive_motor.h
-  include/vesc_ackermann/optional_data_publisher.h
+  src/motor_factory.cpp include/vesc_ackermann/motor_factory.h
   src/steering.cpp include/vesc_ackermann/steering.h
   src/steering_motor.cpp include/vesc_ackermann/steering_motor.h
   include/vesc_ackermann/types.h
   src/utils.cpp include/vesc_ackermann/utils.h
   src/vehicle.cpp include/vesc_ackermann/vehicle.h
   src/wheel.cpp include/vesc_ackermann/wheel.h
-  src/motor_factory.cpp include/vesc_ackermann/motor_factory.h
 )
 
 target_link_libraries(${PROJECT_NAME}

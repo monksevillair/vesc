@@ -42,7 +42,7 @@ public:
 
 protected:
   void reconfigure(VehicleConfig& config);
-  double limitSteeringAngle(double steering_angle) const;
+  static double limit(double value, double max);
 
   ros::NodeHandle nh_;
   MotorFactoryPtr motor_factory_;

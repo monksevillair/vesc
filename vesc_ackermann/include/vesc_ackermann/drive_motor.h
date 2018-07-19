@@ -12,9 +12,8 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <boost/optional.hpp>
 #include <ros/node_handle.h>
 #include <ros/time.h>
-#include <std_msgs/Float64.h>
-#include <vesc_ackermann/optional_data_publisher.h>
 #include <vesc_ackermann/types.h>
+#include <vesc_motor/types.h>
 #include <vesc_motor/vesc_drive_motor.h>
 
 namespace vesc_ackermann
@@ -37,8 +36,7 @@ public:
 class VescDriveMotor : public DriveMotor
 {
 public:
-  VescDriveMotor(ros::NodeHandle& private_nh,
-                 const std::shared_ptr<vesc_motor::VescTransportFactory>& transport_factory,
+  VescDriveMotor(ros::NodeHandle& private_nh, const vesc_motor::DriverFactoryPtr& driver_factory,
                  double control_interval);
 
   double getPosition(const ros::Time& time) override;
@@ -73,9 +71,9 @@ public:
 
 private:
   DriveMotorPtr motor_;
-  OptionalDataPublisher<std_msgs::Float64> velocity_sent_publisher_;
-  OptionalDataPublisher<std_msgs::Float64> velocity_received_publisher_;
-  OptionalDataPublisher<std_msgs::Float64> position_received_publisher_;
+  ros::Publisher velocity_sent_publisher_;
+  ros::Publisher velocity_received_publisher_;
+  ros::Publisher position_received_publisher_;
 };
 }
 

@@ -17,7 +17,6 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <vesc_ackermann/BaseControlConfig.h>
 #include <vesc_ackermann/types.h>
 #include <vesc_ackermann/vehicle.h>
-#include <vesc_motor/vesc_transport_factory.h>
 
 namespace vesc_ackermann
 {

@@ -34,7 +34,8 @@ void BaseControl::reconfigure(BaseControlConfig& config)
   {
     vehicle_.emplace(
       ros::NodeHandle(private_nh_, "vehicle"),
-      std::make_shared<MotorFactory>(private_nh_, 1.0 / (config_.odometry_rate * 2.1), config_.publish_motor_states));
+      std::make_shared<MotorFactory>(private_nh_, 1.0 / (config_.odometry_rate * 2.1), config_.publish_motor_states,
+                                     config_.use_mockup));
   }
 
   if (!odom_pub_ && config_.publish_odom)
