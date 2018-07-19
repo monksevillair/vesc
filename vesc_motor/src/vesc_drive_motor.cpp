@@ -7,13 +7,15 @@ All rights reserved.
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <vesc_motor/vesc_drive_motor.h>
+#include <vesc_driver/motor_controller_state.h>
+#include <vesc_driver/vesc_driver_interface.h>
 #include <functional>
 
 namespace vesc_motor
 {
-VescDriveMotor::VescDriveMotor(const ros::NodeHandle& private_nh,
-                               std::shared_ptr<VescTransportFactory> transport_factory, double execution_duration)
-  : VescMotor(private_nh, transport_factory, execution_duration), reconfigure_server_(private_nh)
+VescDriveMotor::VescDriveMotor(const ros::NodeHandle& private_nh, const DriverFactoryPtr& driver_factory,
+                               const std::chrono::duration<double>& execution_duration)
+  : VescMotor(private_nh, driver_factory, execution_duration), reconfigure_server_(private_nh)
 {
   ROS_DEBUG_STREAM("VescDriveMotor::VescDriveMotor::1");
 
@@ -60,8 +62,7 @@ VescDriveMotor::VescDriveMotor(const ros::NodeHandle& private_nh,
   cv::setIdentity(speed_kf_.errorCovPre);
   ROS_DEBUG_STREAM("VescDriveMotor::VescDriveMotor::9");
 
-  reconfigure_server_.setCallback(
-    std::bind(&VescDriveMotor::reconfigure, this, std::placeholders::_1, std::placeholders::_2));
+  reconfigure_server_.setCallback(std::bind(&VescDriveMotor::reconfigure, this, std::placeholders::_1));
 
   ROS_DEBUG_STREAM("VescDriveMotor::VescDriveMotor::10");
 }
@@ -85,7 +86,7 @@ void VescDriveMotor::brake(double current)
   driver_->setBrake(current);
 }
 
-void VescDriveMotor::reconfigure(DriveMotorConfig& config, uint32_t /*level*/)
+void VescDriveMotor::reconfigure(DriveMotorConfig& config)
 {
   ROS_DEBUG_STREAM("VescDriveMotor::reconfigure::1");
 
@@ -103,7 +104,10 @@ void VescDriveMotor::reconfigure(DriveMotorConfig& config, uint32_t /*level*/)
     ROS_ERROR("Parameter motor_poles is not set");
   }
 
-  updateDriver(config_.use_mockup);
+  if (!driver_)
+  {
+    createDriver();
+  }
 }
 
 void VescDriveMotor::processMotorControllerState(const vesc_driver::MotorControllerState& state)
@@ -123,9 +127,6 @@ void VescDriveMotor::processMotorControllerState(const vesc_driver::MotorControl
   {
     ROS_WARN("Skipping state correction due to failed prediction");
   }
-
-  // Call super class implementation:
-  VescMotor::processMotorControllerState(state);
 
   ROS_DEBUG_STREAM("VescDriveMotor::processMotorControllerState: corrected velocity: "
                      << speed_kf_.statePost.at<float>(0));
@@ -175,5 +176,4 @@ void VescDriveMotor::correct(double velocity)
 
   ROS_DEBUG_STREAM("VescDriveMotor::correct::2");
 }
-
 }

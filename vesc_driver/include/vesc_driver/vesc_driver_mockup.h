@@ -10,9 +10,10 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #ifndef VESC_DRIVER_VESC_DRIVER_MOCKUP_H
 #define VESC_DRIVER_VESC_DRIVER_MOCKUP_H
 
-#include <vesc_driver/vesc_driver_interface.h>
-#include <vesc_driver/periodic_task.h>
 #include <mutex>
+#include <vesc_driver/packet.h>
+#include <vesc_driver/periodic_task.h>
+#include <vesc_driver/vesc_driver_interface.h>
 
 namespace vesc_driver
 {

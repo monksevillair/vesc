@@ -2,15 +2,15 @@ cmake_minimum_required(VERSION 2.8.3)
 project(vesc_driver)
 
 find_package(catkin REQUIRED COMPONENTS
-  pluginlib
   roscpp
   serial
-  std_msgs
 )
+
+find_package(Boost REQUIRED)
 
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS pluginlib roscpp serial std_msgs
+  CATKIN_DEPENDS serial
   LIBRARIES ${PROJECT_NAME}
 )
 
@@ -18,7 +18,7 @@ catkin_package(
 ## Build ##
 ###########
 
-add_compile_options(-std=c++11)
+add_compile_options(-std=c++11 -Wall -Wextra)
 
 include_directories(
   include
@@ -37,6 +37,7 @@ add_library(${PROJECT_NAME}
   include/vesc_driver/serial_transport.h src/serial_transport.cpp
   include/vesc_driver/transport.h
   include/vesc_driver/transport_request.h src/transport_request.cpp
+  include/vesc_driver/types.h
   include/vesc_driver/vesc_driver_impl.h src/vesc_driver_impl.cpp
   include/vesc_driver/vesc_driver_interface.h src/vesc_driver_interface.cpp
   include/vesc_driver/vesc_driver_mockup.h src/vesc_driver_mockup.cpp

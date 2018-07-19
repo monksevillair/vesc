@@ -18,15 +18,14 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <ros/time.h>
 #include <vesc_motor/DriveMotorConfig.h>
 #include <vesc_motor/vesc_motor.h>
-#include <vesc_motor/vesc_transport_factory.h>
 
 namespace vesc_motor
 {
 class VescDriveMotor : public VescMotor
 {
 public:
-  VescDriveMotor(const ros::NodeHandle& private_nh, std::shared_ptr<VescTransportFactory> transport_factory,
-                 double execution_duration);
+  VescDriveMotor(const ros::NodeHandle& private_nh, const DriverFactoryPtr& driver_factory,
+                 const std::chrono::duration<double>& execution_duration);
 
   /**
    * Gets the current motor velocity in rad/s, estimated at the given time.
@@ -50,7 +49,7 @@ public:
 protected:
   void processMotorControllerState(const vesc_driver::MotorControllerState& state) override;
 
-  void reconfigure(DriveMotorConfig& config, uint32_t level);
+  void reconfigure(DriveMotorConfig& config);
   double getVelocityConversionFactor() const;
 
   bool predict(const ros::Time &time);

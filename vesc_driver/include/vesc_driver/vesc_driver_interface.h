@@ -11,8 +11,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #define VESC_DRIVER_VESC_DRIVER_INTERFACE_H
 
 #include <functional>
-#include <vesc_driver/motor_controller_state.h>
-#include <vesc_driver/packet.h>
+#include <vesc_driver/types.h>
 
 namespace vesc_driver
 {

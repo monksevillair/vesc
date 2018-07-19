@@ -19,7 +19,6 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <thread>
 #include <vector>
 #include <vesc_driver/blocking_queue.h>
-#include <vesc_driver/serial_data_reader.h>
 #include <vesc_driver/serial_packet_codec.h>
 #include <vesc_driver/transport.h>
 

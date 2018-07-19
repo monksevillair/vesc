@@ -9,13 +9,15 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 #include <vesc_motor/vesc_steering_motor.h>
 #include <functional>
+#include <vesc_driver/motor_controller_state.h>
+#include <vesc_driver/vesc_driver_interface.h>
 
 namespace vesc_motor
 {
 
-VescSteeringMotor::VescSteeringMotor(const ros::NodeHandle& private_nh,
-                                     std::shared_ptr<VescTransportFactory> transport_factory, double execution_duration)
-  : VescMotor(private_nh, transport_factory, execution_duration), reconfigure_server_(private_nh)
+VescSteeringMotor::VescSteeringMotor(const ros::NodeHandle& private_nh, const DriverFactoryPtr& driver_factory,
+                                     const std::chrono::duration<double>& execution_duration)
+  : VescMotor(private_nh, driver_factory, execution_duration), reconfigure_server_(private_nh)
 {
   // Init Kalman filter:
   unsigned int state_size = 2; // [p, v]
@@ -52,8 +54,7 @@ VescSteeringMotor::VescSteeringMotor(const ros::NodeHandle& private_nh,
   // Priori error estimate covariance matrix (P'(k)): P'(k)=A*P(k-1)*At + Q):
   cv::setIdentity(position_kf_.errorCovPre);
 
-  reconfigure_server_.setCallback(
-    std::bind(&VescSteeringMotor::reconfigure, this, std::placeholders::_1, std::placeholders::_2));
+  reconfigure_server_.setCallback(std::bind(&VescSteeringMotor::reconfigure, this, std::placeholders::_1));
 }
 
 double VescSteeringMotor::getPosition(const ros::Time& time)
@@ -76,7 +77,7 @@ void VescSteeringMotor::setPosition(double position)
   driver_->setPosition(position * (config_.invert_direction ? -1. : 1.) + config_.position_offset);
 }
 
-void VescSteeringMotor::reconfigure(SteeringMotorConfig& config, uint32_t level)
+void VescSteeringMotor::reconfigure(SteeringMotorConfig& config)
 {
   ROS_DEBUG_STREAM("VescSteeringMotor::reconfigure::1");
 
@@ -87,9 +88,12 @@ void VescSteeringMotor::reconfigure(SteeringMotorConfig& config, uint32_t level)
 
   config_ = config;
 
-  ROS_DEBUG_STREAM("VescSteeringMotor::reconfigure::2");
+  if (!driver_)
+  {
+    createDriver();
+  }
 
-  updateDriver(config_.use_mockup);
+  ROS_DEBUG_STREAM("VescSteeringMotor::reconfigure::2");
 }
 
 void VescSteeringMotor::processMotorControllerState(const vesc_driver::MotorControllerState& state)
@@ -113,9 +117,6 @@ void VescSteeringMotor::processMotorControllerState(const vesc_driver::MotorCont
   }
 //  ROS_INFO_STREAM("VescSteeringMotor::processMotorControllerState: position after correction: "
 //                    << position_kf_.statePost.at<float>(0));
-
-  // Call super class implementation:
-  VescMotor::processMotorControllerState(state);
 }
 
 bool VescSteeringMotor::predict(const ros::Time& time)

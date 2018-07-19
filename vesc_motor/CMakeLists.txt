@@ -9,7 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure
   roscpp
   vesc_driver
-  )
+)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -61,7 +61,7 @@ catkin_package(
 ###########
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-add_compile_options(-std=c++11)
+add_compile_options(-std=c++11 -Wall -Wextra)
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
@@ -73,11 +73,12 @@ include_directories(
 
 ## Declare a C++ library
 add_library(${PROJECT_NAME}
+  src/transport_factory.cpp include/vesc_motor/transport_factory.h
+  include/vesc_motor/types.h
   src/vesc_drive_motor.cpp include/vesc_motor/vesc_drive_motor.h
   src/vesc_motor.cpp include/vesc_motor/vesc_motor.h
   src/vesc_steering_motor.cpp include/vesc_motor/vesc_steering_motor.h
-  src/vesc_transport_factory.cpp include/vesc_motor/vesc_transport_factory.h
-)
+  src/driver_factory.cpp include/vesc_motor/driver_factory.h)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries

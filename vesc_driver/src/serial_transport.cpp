@@ -138,7 +138,7 @@ void SerialTransport::readLoop()
 
     ROS_DEBUG_STREAM("SerialTransport::readLoop::7");
 
-    uint16_t payload_size;
+    uint16_t payload_size = 0;
     {
       SerialDataReader reader(read_buffer.begin() + 1, read_buffer.end());
       if (start_byte == SMALL_FRAME_SOF_BYTE)

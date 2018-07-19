@@ -11,8 +11,10 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #define VESC_DRIVER_VESC_DRIVER_IMPL_H
 
 #include <atomic>
+#include <boost/variant/static_visitor.hpp>
+#include <vesc_driver/packet.h>
 #include <vesc_driver/periodic_task.h>
-#include <vesc_driver/transport.h>
+#include <vesc_driver/types.h>
 #include <vesc_driver/vesc_driver_interface.h>
 
 namespace vesc_driver
@@ -21,8 +23,7 @@ class VescDriverImpl : public VescDriverInterface
 {
 public:
   VescDriverImpl(const std::chrono::duration<double>& sleep_duration,
-                 const StateHandlerFunction& state_handler_function, uint8_t controller_id,
-                 std::shared_ptr<Transport> transport);
+                 const StateHandlerFunction& state_handler_function, uint8_t controller_id, TransportPtr transport);
 
   void setDutyCycle(double duty_cycle) override;
 
@@ -54,7 +55,7 @@ protected:
   void processMotorControllerStatePacket(const MotorControllerState& state);
 
   PeriodicTask task_;
-  std::shared_ptr<Transport> transport_;
+  TransportPtr transport_;
 
   std::atomic<bool> initialized_{false};
 

@@ -9,13 +9,13 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <vesc_driver/vesc_driver_impl.h>
 #include <functional>
 #include <ros/console.h>
-#include <vesc_driver/serial_transport.h>
+#include <vesc_driver/transport.h>
 
 namespace vesc_driver
 {
 VescDriverImpl::VescDriverImpl(const std::chrono::duration<double>& sleep_duration,
                                const StateHandlerFunction& state_handler_function, uint8_t controller_id,
-                               std::shared_ptr<Transport> transport)
+                               TransportPtr transport)
   : VescDriverInterface(state_handler_function), task_(std::bind(&VescDriverImpl::execute, this), sleep_duration),
     transport_(std::move(transport)), controller_id_(controller_id)
 {

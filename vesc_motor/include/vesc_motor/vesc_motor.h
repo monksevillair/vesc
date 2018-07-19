@@ -6,17 +6,17 @@
 
 #include <atomic>
 #include <chrono>
-#include <vesc_driver/motor_controller_state.h>
-#include <vesc_driver/vesc_driver_interface.h>
-#include <vesc_motor/vesc_transport_factory.h>
+#include <ros/node_handle.h>
+#include <vesc_driver/types.h>
+#include <vesc_motor/types.h>
 
 namespace vesc_motor
 {
 class VescMotor
 {
 public:
-  VescMotor(const ros::NodeHandle& private_nh, std::shared_ptr<VescTransportFactory> transport_factory,
-            double execution_duration);
+  VescMotor(const ros::NodeHandle& private_nh, const DriverFactoryPtr& driver_factory,
+            const std::chrono::duration<double>& execution_duration);
   virtual ~VescMotor() = default;
 
   /**
@@ -26,19 +26,17 @@ public:
   double getSupplyVoltage();
 
 protected:
-  void updateDriver(bool use_mockup);
+  void createDriver();
+  virtual void processMotorControllerState(const vesc_driver::MotorControllerState& state) = 0;
 
-  virtual void processMotorControllerState(const vesc_driver::MotorControllerState& state);
-
-  boost::shared_ptr<vesc_driver::VescDriverInterface> driver_;
+  vesc_driver::VescDriverInterfacePtr driver_;
 
 private:
   void callProcessMotorControllerState(const vesc_driver::MotorControllerState& state);
 
   ros::NodeHandle private_nh_;
-  std::shared_ptr<VescTransportFactory> transport_factory_;
+  DriverFactoryPtr driver_factory_;
   std::chrono::duration<double> execution_duration_;
-  vesc_driver::VescDriverInterface::StateHandlerFunction state_handler_function_;
   std::atomic<double> supply_voltage_;
 };
 }

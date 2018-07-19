@@ -18,15 +18,14 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <ros/time.h>
 #include <vesc_motor/SteeringMotorConfig.h>
 #include <vesc_motor/vesc_motor.h>
-#include <vesc_motor/vesc_transport_factory.h>
 
 namespace vesc_motor
 {
 class VescSteeringMotor : public VescMotor
 {
 public:
-  VescSteeringMotor(const ros::NodeHandle& private_nh, std::shared_ptr<VescTransportFactory> transport_factory,
-                    double execution_duration);
+  VescSteeringMotor(const ros::NodeHandle& private_nh, const DriverFactoryPtr& driver_factory,
+                    const std::chrono::duration<double>& execution_duration);
 
   /**
    * Gets the current position of the motor in radians, estimated at the given time.
@@ -49,7 +48,7 @@ public:
   void setPosition(double position);
 
 private:
-  void reconfigure(SteeringMotorConfig& config, uint32_t level);
+  void reconfigure(SteeringMotorConfig& config);
   void processMotorControllerState(const vesc_driver::MotorControllerState& state) override;
 
   bool predict(const ros::Time& time);

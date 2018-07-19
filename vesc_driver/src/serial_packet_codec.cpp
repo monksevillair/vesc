@@ -134,12 +134,12 @@ void SerialPacketCodec::Encoder::operator()(const SetPositionPacket& packet)
   writer_.writeFloat32(packet.position * 1e6);
 }
 
-void SerialPacketCodec::Encoder::operator()(const GetValuesPacket& packet)
+void SerialPacketCodec::Encoder::operator()(const GetValuesPacket& /*packet*/)
 {
   writePayloadId(writer_, PayloadId::GET_VALUES);
 }
 
-void SerialPacketCodec::Encoder::operator()(const GetFirmwareVersionPacket& packet)
+void SerialPacketCodec::Encoder::operator()(const GetFirmwareVersionPacket& /*packet*/)
 {
   writePayloadId(writer_, PayloadId::GET_FIRMWARE_VERSION);
 }
