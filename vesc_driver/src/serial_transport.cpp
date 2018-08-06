@@ -98,145 +98,151 @@ void SerialTransport::readLoop()
 
   while (should_read_)
   {
-    ROS_DEBUG_STREAM("SerialTransport::readLoop::2");
-
-    Buffer read_buffer;
-    const uint8_t start_byte = readStartByte(read_buffer);
-    if (!should_read_)
+    try
     {
-      break;
-    }
+      ROS_DEBUG_STREAM("SerialTransport::readLoop::2");
 
-    ROS_DEBUG_STREAM("SerialTransport::readLoop::3");
+      boost::optional<ResponsePacket> packet;
+      Buffer read_buffer;
+      const boost::optional<uint8_t> start_byte = readStartByte(read_buffer);
 
-    ROS_DEBUG_STREAM("SerialTransport::readLoop::4");
-
-    size_t payload_size_bytes;
-    if (start_byte == SMALL_FRAME_SOF_BYTE)
-    {
-      payload_size_bytes = 1;
-    }
-    else if (start_byte == LARGE_FRAME_SOF_BYTE)
-    {
-      payload_size_bytes = 2;
-    }
-    else
-    {
-      ROS_DEBUG_STREAM("SerialTransport::readLoop::5");
-      // Skip invalid packet:
-      continue;
-    }
-
-    ROS_DEBUG_STREAM("SerialTransport::readLoop::6 payload_size_bytes: " << payload_size_bytes);
-
-    // At least start byte and payload size needs to be read:
-    readBytesUntilSizeReached(1 + payload_size_bytes, read_buffer);
-    if (!should_read_)
-    {
-      break;
-    }
-
-    ROS_DEBUG_STREAM("SerialTransport::readLoop::7");
-
-    uint16_t payload_size = 0;
-    {
-      SerialDataReader reader(read_buffer.begin() + 1, read_buffer.end());
-      if (start_byte == SMALL_FRAME_SOF_BYTE)
+      // At least start byte and payload size needs to be read:
+      if (start_byte && readBytesUntilSizeReached(3, read_buffer))
       {
-        payload_size = reader.readUnsignedInt8();
-      }
-      else if (start_byte == LARGE_FRAME_SOF_BYTE)
-      {
-        payload_size = reader.readUnsignedInt16();
-      }
-    }
+        ROS_DEBUG_STREAM("SerialTransport::readLoop::3");
 
-    ROS_DEBUG_STREAM("SerialTransport::readLoop::8 payload_size: " << static_cast<int>(payload_size));
-
-    // At least start byte, payload size, payload, crc, and eof byte needs to be read:
-    readBytesUntilSizeReached(1 + payload_size_bytes + payload_size + 2 + 1, read_buffer);
-    if (!should_read_)
-    {
-      break;
-    }
-
-    ROS_DEBUG_STREAM("SerialTransport::readLoop::9");
-    ROS_DEBUG_STREAM("SerialTransport::readLoop::9.1 payload_size_bytes: "
-                       << payload_size_bytes << " payload_size: " << payload_size << " read_buffer.size()"
-                       << read_buffer.size());
-    for (const auto byte : read_buffer)
-    {
-      ROS_DEBUG_STREAM("SerialTransport::readLoop::9.2 read_bytes: " << static_cast<int>(byte));
-    }
-
-    const Buffer::const_iterator payload_begin(read_buffer.begin() + 1 + payload_size_bytes);
-    const Buffer::const_iterator payload_end(payload_begin + payload_size);
-
-    {
-      SerialDataReader reader(payload_end, read_buffer.end());
-      const uint16_t crc_value = reader.readUnsignedInt16();
-      const uint8_t eof_byte = reader.readUnsignedInt8();
-
-      if (eof_byte != EOF_BYTE)
-      {
-        ROS_DEBUG_STREAM("SerialTransport::readLoop::10");
-        // Skip invalid packet:
-        continue;
-      }
-
-      ROS_DEBUG_STREAM("SerialTransport::readLoop::11");
-      ROS_DEBUG_STREAM("SerialTransport::readLoop::12");
-
-      CRC crc_calculation;
-      crc_calculation.process_block(&*payload_begin, &*payload_end);
-      if (crc_calculation.checksum() != crc_value)
-      {
-        ROS_DEBUG_STREAM("SerialTransport::readLoop::13");
-        // Skip invalid packet:
-        continue;
-      }
-    }
-
-    ROS_DEBUG_STREAM("SerialTransport::readLoop::14");
-
-    SerialDataReader payload_reader(payload_begin, payload_end);
-    const boost::optional<ResponsePacket> packet = packet_codec_.decode(payload_reader);
-
-    if (!packet)
-    {
-      ROS_DEBUG_STREAM("SerialTransport::readLoop::15");
-      // Skip invalid packet:
-      continue;
-    }
-
-    {
-      ROS_DEBUG_STREAM("SerialTransport::readLoop::16");
-
-      std::unique_lock<std::mutex> should_respond_lock(should_respond_mutex_);
-      if (should_respond_)
-      {
-        ROS_DEBUG_STREAM("SerialTransport::readLoop::17");
-
-        should_respond_ = false;
-
-        std::lock_guard<std::mutex> packet_handler_lock(packet_handler_mutex_);
-        const PacketHandlers::const_iterator packet_handler_mapping = packet_handlers_.find(respond_id_);
-        if (packet_handler_mapping != packet_handlers_.end())
+        size_t payload_size_size = 0;
+        size_t payload_size = 0;
         {
-          ROS_DEBUG_STREAM("SerialTransport::readLoop::19");
-          packet_handler_mapping->second(packet.get());
+          SerialDataReader reader(read_buffer.begin() + 1, read_buffer.end());
+          if (*start_byte == SMALL_FRAME_SOF_BYTE)
+          {
+            payload_size_size = 1;
+            payload_size = reader.readUnsignedInt8();
+          }
+          else if (*start_byte == LARGE_FRAME_SOF_BYTE)
+          {
+            payload_size_size = 2;
+            payload_size = reader.readUnsignedInt16();
+          }
+          else
+          {
+            ROS_ERROR_STREAM("SerialTransport::readLoop: invalid start byte; this should never happen");
+            // Skip invalid packet:
+            continue;
+          }
         }
 
-        should_respond_condition_.notify_all();
+        ROS_DEBUG_STREAM("SerialTransport::readLoop::6 payload_size_size: " << payload_size_size);
+        ROS_DEBUG_STREAM("SerialTransport::readLoop::8 payload_size: " << static_cast<int>(payload_size));
+
+        // At least start byte, payload size, payload, crc, and eof byte needs to be read:
+        if (readBytesUntilSizeReached(1 + payload_size_size + payload_size + 2 + 1, read_buffer))
+        {
+          ROS_DEBUG_STREAM("SerialTransport::readLoop::9");
+          ROS_DEBUG_STREAM("SerialTransport::readLoop::9.1 payload_size_size: "
+                             << payload_size_size << " payload_size: " << payload_size << " read_buffer.size()"
+                             << read_buffer.size());
+          for (const auto byte : read_buffer)
+          {
+            ROS_DEBUG_STREAM("SerialTransport::readLoop::9.2 read_bytes: " << static_cast<int>(byte));
+          }
+
+          const Buffer::const_iterator payload_begin(read_buffer.begin() + 1 + payload_size_size);
+          const Buffer::const_iterator payload_end(payload_begin + payload_size);
+
+          {
+            SerialDataReader reader(payload_end, read_buffer.end());
+            const uint16_t crc_value = reader.readUnsignedInt16();
+            const uint8_t eof_byte = reader.readUnsignedInt8();
+
+            if (eof_byte != EOF_BYTE)
+            {
+              ROS_DEBUG_STREAM("SerialTransport::readLoop::10");
+              // Skip invalid packet:
+              continue;
+            }
+
+            ROS_DEBUG_STREAM("SerialTransport::readLoop::11");
+            ROS_DEBUG_STREAM("SerialTransport::readLoop::12");
+
+            CRC crc_calculation;
+            crc_calculation.process_block(&*payload_begin, &*payload_end);
+            if (crc_calculation.checksum() != crc_value)
+            {
+              ROS_DEBUG_STREAM("SerialTransport::readLoop::13");
+              // Skip invalid packet:
+              continue;
+            }
+          }
+
+          ROS_DEBUG_STREAM("SerialTransport::readLoop::14");
+
+          SerialDataReader payload_reader(payload_begin, payload_end);
+          packet = packet_codec_.decode(payload_reader);
+
+          if (!packet)
+          {
+            ROS_DEBUG_STREAM("SerialTransport::readLoop::15");
+            // Skip invalid packet:
+            continue;
+          }
+        }
       }
+
+      {
+        ROS_DEBUG_STREAM("SerialTransport::readLoop::16");
+        std::unique_lock<std::mutex> should_respond_lock(should_respond_mutex_);
+        if (should_respond_)
+        {
+          ROS_DEBUG_STREAM("SerialTransport::readLoop::17");
+
+          should_respond_ = false;
+
+          if (packet)
+          {
+            std::lock_guard<std::mutex> packet_handler_lock(packet_handler_mutex_);
+            const PacketHandlers::const_iterator packet_handler_mapping = packet_handlers_.find(respond_id_);
+            if (packet_handler_mapping != packet_handlers_.end())
+            {
+              ROS_DEBUG_STREAM("SerialTransport::readLoop::19");
+              packet_handler_mapping->second(packet.get());
+            }
+          }
+          else
+          {
+            ROS_ERROR_STREAM("SerialTransport::readLoop: timeout when waiting for response packet");
+
+            std::lock_guard<std::mutex> packet_handler_lock(packet_handler_mutex_);
+            const TimeoutHandlers::const_iterator timeout_handler_mapping = timeout_handlers_.find(respond_id_);
+            if (timeout_handler_mapping != timeout_handlers_.end())
+            {
+              ROS_DEBUG_STREAM("SerialTransport::readLoop::20");
+              timeout_handler_mapping->second();
+            }
+          }
+
+          should_respond_condition_.notify_all();
+        }
+      }
+    }
+    catch (const std::exception& ex)
+    {
+      ROS_ERROR_STREAM("SerialTransport::readLoop: got exception: " << ex.what());
     }
   }
 }
 
 void SerialTransport::registerPacketHandler(uint8_t controller_id, Transport::PacketHandler&& packet_handler)
 {
-  std::lock_guard<std::mutex> pacekt_handler_lock(packet_handler_mutex_);
+  std::lock_guard<std::mutex> packet_handler_lock(packet_handler_mutex_);
   packet_handlers_[controller_id] = packet_handler;
+}
+
+void SerialTransport::registerTimeoutHandler(uint8_t controller_id, TimeoutHandler&& timeout_handler)
+{
+  std::lock_guard<std::mutex> packet_handler_lock(packet_handler_mutex_);
+  timeout_handlers_[controller_id] = timeout_handler;
 }
 
 void SerialTransport::writeLoop()
@@ -254,7 +260,7 @@ void SerialTransport::writeLoop()
 
       {
         std::unique_lock<std::mutex> should_respond_lock(should_respond_mutex_);
-        while (should_respond_)
+        while (should_write_ && should_respond_)
         {
           should_respond_condition_.wait(should_respond_lock);
         }
@@ -290,6 +296,10 @@ void SerialTransport::writeLoop()
       ROS_DEBUG_STREAM("SerialTransport::writeLoop::9");
       break;
     }
+    catch (const std::exception& ex)
+    {
+      ROS_ERROR_STREAM("SerialTransport::writeLoop: got exception: " << ex.what());
+    }
   }
 }
 
@@ -307,7 +317,7 @@ void SerialTransport::stopThreads()
   }
 }
 
-uint8_t SerialTransport::readStartByte(Buffer& buffer)
+boost::optional<uint8_t> SerialTransport::readStartByte(Buffer& buffer)
 {
   while (should_read_)
   {
@@ -315,7 +325,12 @@ uint8_t SerialTransport::readStartByte(Buffer& buffer)
 
     buffer.clear();
 
-    readBytes(MIN_FRAME_SIZE, buffer);
+    if (!readBytes(MIN_FRAME_SIZE, buffer))
+    {
+      // Timeout
+      return boost::none;
+    }
+
     ROS_DEBUG_STREAM("SerialTransport::readStartByte::2");
 
     for (Buffer::const_iterator it = buffer.begin(); it != buffer.end(); ++it)
@@ -331,37 +346,23 @@ uint8_t SerialTransport::readStartByte(Buffer& buffer)
       }
     }
   }
-  return 0;
+  return boost::none;
 }
 
-void SerialTransport::readBytes(const size_t size, Buffer& buffer)
+bool SerialTransport::readBytes(const size_t size, Buffer& buffer)
 {
-  ROS_DEBUG_STREAM("SerialTransport::readBytes::1");
-  ROS_DEBUG_STREAM("SerialTransport::readBytes::1.1 size: " << size);
+  ROS_DEBUG_STREAM("SerialTransport::readBytes");
 
-  ROS_DEBUG_STREAM("SerialTransport::readBytes::2");
+  if (!should_read_)
+  {
+    return false;
+  }
 
   const size_t start_index = buffer.size();
   buffer.resize(start_index + size);
-  size_t read_bytes = 0;
-  while (should_read_ && read_bytes < size)
-  {
-    ROS_DEBUG_STREAM("SerialTransport::readBytes::3");
 
-    const size_t remaining_bytes = size - read_bytes;
-
-    ROS_DEBUG_STREAM("SerialTransport::readBytes::4 remaining_bytes: " << remaining_bytes);
-
-    // Using pointer variant of read() because implementation does not allocate extra buffer:
-    const size_t new_read_bytes = serial_port_.read(&buffer.at(start_index + read_bytes), remaining_bytes);
-
-    ROS_DEBUG_STREAM("SerialTransport::readBytes::5 new_read_bytes: " << new_read_bytes);
-
-    ROS_DEBUG_STREAM("SerialTransport::readBytes::6");
-    read_bytes += new_read_bytes;
-
-    ROS_DEBUG_STREAM("SerialTransport::readBytes::7 read_bytes: " << read_bytes);
-  }
+  // Using pointer variant of read() because implementation does not allocate extra buffer:
+  const size_t read_bytes = serial_port_.read(&buffer.at(start_index), size);
 
   buffer.resize(start_index + read_bytes);
 
@@ -370,14 +371,17 @@ void SerialTransport::readBytes(const size_t size, Buffer& buffer)
   {
     ROS_DEBUG_STREAM("SerialTransport::readBytes::8.1 buffer: " << static_cast<int>(byte));
   }
+
+  return read_bytes == size;
 }
 
-void SerialTransport::readBytesUntilSizeReached(const size_t size, Buffer& buffer)
+bool SerialTransport::readBytesUntilSizeReached(const size_t size, Buffer& buffer)
 {
   if (size > buffer.size())
   {
-    readBytes(size - buffer.size(), buffer);
+    return readBytes(size - buffer.size(), buffer);
   }
+  return true;
 }
 
 SerialTransport::Buffer SerialTransport::encodePacket(const TransportRequest& request)

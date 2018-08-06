@@ -12,6 +12,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 #include <atomic>
 #include <boost/crc.hpp>
+#include <boost/optional.hpp>
 #include <cstdint>
 #include <map>
 #include <mutex>
@@ -34,6 +35,8 @@ public:
 
   void registerPacketHandler(uint8_t controller_id, PacketHandler&& packet_handler) override;
 
+  void registerTimeoutHandler(uint8_t controller_id, TimeoutHandler&& timeout_handler) override;
+
   void connect();
 
   bool isConnected();
@@ -43,6 +46,7 @@ public:
 protected:
   typedef std::vector<uint8_t> Buffer;
   typedef std::map<uint8_t, Transport::PacketHandler> PacketHandlers;
+  typedef std::map<uint8_t, Transport::TimeoutHandler> TimeoutHandlers;
   typedef boost::crc_optimal<16, 0x1021, 0, 0, false, false> CRC;
 
   constexpr static size_t MIN_FRAME_SIZE = 5;
@@ -58,6 +62,15 @@ protected:
   void readLoop();
 
   void stopThreads();
+
+  bool readBytes(size_t size, Buffer& buffer);
+
+  bool readBytesUntilSizeReached(size_t size, Buffer& buffer);
+
+  boost::optional<uint8_t> readStartByte(Buffer& buffer);
+
+  Buffer encodePacket(const TransportRequest& request);
+  Buffer addFrame(const Buffer& payload);
 
   uint8_t controller_id_;
 
@@ -76,17 +89,9 @@ protected:
   std::thread read_thread_;
   std::mutex packet_handler_mutex_;
   PacketHandlers packet_handlers_;
+  TimeoutHandlers timeout_handlers_;
 
   SerialPacketCodec packet_codec_;
-
-  uint8_t readStartByte(Buffer& buffer);
-
-  void readBytes(size_t size, Buffer& buffer);
-
-  void readBytesUntilSizeReached(size_t size, Buffer& buffer);
-
-  Buffer encodePacket(const TransportRequest& request);
-  Buffer addFrame(const Buffer& payload);
 };
 }
 

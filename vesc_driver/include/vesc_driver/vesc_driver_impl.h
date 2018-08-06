@@ -51,6 +51,7 @@ protected:
   void execute();
 
   void processResponsePacket(const ResponsePacket& packet);
+  void processTransportTimeout();
   void processFirmwareVersionPacket(const FirmwareVersion& firmware_version);
   void processMotorControllerStatePacket(const MotorControllerState& state);
 

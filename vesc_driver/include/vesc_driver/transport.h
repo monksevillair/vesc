@@ -18,12 +18,15 @@ class Transport
 {
 public:
   typedef std::function<void(const ResponsePacket&)> PacketHandler;
+  typedef std::function<void()> TimeoutHandler;
 
   virtual ~Transport() = default;
 
   virtual void submit(TransportRequest&& r) = 0;
 
   virtual void registerPacketHandler(uint8_t controller_id, PacketHandler&& packet_handler) = 0;
+
+  virtual void registerTimeoutHandler(uint8_t controller_id, TimeoutHandler&& timeout_handler) = 0;
 };
 }
 

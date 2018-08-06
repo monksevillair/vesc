@@ -22,6 +22,7 @@ VescDriverImpl::VescDriverImpl(const std::chrono::duration<double>& sleep_durati
   task_.start();
   transport_->registerPacketHandler(
     controller_id, std::bind(&VescDriverImpl::processResponsePacket, this, std::placeholders::_1));
+  transport_->registerTimeoutHandler(controller_id, std::bind(&VescDriverImpl::processTransportTimeout, this));
 }
 
 void VescDriverImpl::setDutyCycle(double duty_cycle)
@@ -111,6 +112,12 @@ void VescDriverImpl::processResponsePacket(const ResponsePacket& packet)
 
     ROS_WARN_STREAM("VescDriverImpl::processResponsePacket: received response packet without waiting for it");
   }
+}
+
+void VescDriverImpl::processTransportTimeout()
+{
+  std::unique_lock<std::mutex> wait_for_response_lock(wait_for_response_mutex_);
+  wait_for_response_ = false;
 }
 
 void VescDriverImpl::processFirmwareVersionPacket(const FirmwareVersion& firmware_version)
