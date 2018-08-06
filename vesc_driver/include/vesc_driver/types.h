@@ -12,6 +12,10 @@ struct FirmwareVersion;
 
 struct MotorControllerState;
 
+class SerialTransport;
+
+typedef std::shared_ptr<SerialTransport> SerialTransportPtr;
+
 class Transport;
 
 typedef std::shared_ptr<Transport> TransportPtr;

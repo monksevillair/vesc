@@ -8,7 +8,7 @@
 namespace vesc_driver
 {
 SerialDataWriter::SerialDataWriter(Buffer& buffer)
-  : SerialDataWriter(buffer, buffer_.end())
+  : SerialDataWriter(buffer, buffer.end())
 {
 }
 
@@ -57,7 +57,10 @@ void SerialDataWriter::writeFloat16(double value)
   {
     writeInt16(static_cast<int16_t>(value));
   }
-  throw std::out_of_range("value is outside range for float16");
+  else
+  {
+    throw std::out_of_range("value is outside range for float16: " + std::to_string(value));
+  }
 }
 
 void SerialDataWriter::writeFloat32(double value)
@@ -66,7 +69,10 @@ void SerialDataWriter::writeFloat32(double value)
   {
     writeInt32(static_cast<int32_t>(value));
   }
-  throw std::out_of_range("value is outside range for float32");
+  else
+  {
+    throw std::out_of_range("value is outside range for float32: " + std::to_string(value));
+  }
 }
 
 void SerialDataWriter::writeBlock(Buffer::const_iterator begin, Buffer::const_iterator end)
