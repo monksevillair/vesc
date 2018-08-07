@@ -19,10 +19,10 @@ VescDriverImpl::VescDriverImpl(const std::chrono::duration<double>& sleep_durati
   : VescDriverInterface(state_handler_function), task_(std::bind(&VescDriverImpl::execute, this), sleep_duration),
     transport_(std::move(transport)), controller_id_(controller_id)
 {
-  task_.start();
   transport_->registerPacketHandler(
     controller_id, std::bind(&VescDriverImpl::processResponsePacket, this, std::placeholders::_1));
   transport_->registerTimeoutHandler(controller_id, std::bind(&VescDriverImpl::processTransportTimeout, this));
+  task_.start();
 }
 
 void VescDriverImpl::setDutyCycle(double duty_cycle)

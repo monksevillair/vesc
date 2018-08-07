@@ -190,6 +190,12 @@ void SerialTransport::readLoop()
         }
       }
 
+      // do not handle the package if we should not read bytes -> package never existed
+      if (!should_read_)
+      {
+        break;
+      }
+
       {
         ROS_DEBUG_STREAM("SerialTransport::readLoop::16");
         std::unique_lock<std::mutex> should_respond_lock(should_respond_mutex_);
@@ -264,6 +270,12 @@ void SerialTransport::writeLoop()
         {
           should_respond_condition_.wait(should_respond_lock);
         }
+      }
+
+      // if we should no longer write something do not send the package
+      if (!should_write_)
+      {
+        break;
       }
 
       ROS_DEBUG_STREAM("SerialTransport::writeLoop::3");
