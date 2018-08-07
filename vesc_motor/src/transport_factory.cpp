@@ -83,7 +83,7 @@ vesc_driver::TransportPtr TransportFactory::getTransport(const std::string& name
 }
 
 vesc_driver::TransportPtr TransportFactory::createSerialTransport(uint8_t controller_id,
-                                                                                    const std::string& port)
+                                                                  const std::string& port)
 {
   ROS_DEBUG_STREAM("TransportFactory::createSerialTransport: create");
 

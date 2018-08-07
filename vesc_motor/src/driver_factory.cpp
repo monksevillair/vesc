@@ -47,6 +47,10 @@ vesc_driver::VescDriverInterfacePtr DriverFactory::createDriver(
         ROS_ERROR_STREAM("Could not determine type of transport from " << nh.getNamespace());
       }
     }
+    else
+    {
+      ROS_ERROR_STREAM("Could not get a valid controller id used for transport from " << nh.getNamespace());
+    }
   }
 
   return std::make_shared<vesc_driver::VescDriverMockup>(execution_duration, state_handler_function);

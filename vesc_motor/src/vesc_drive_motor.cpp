@@ -112,6 +112,7 @@ void VescDriveMotor::reconfigure(DriveMotorConfig& config)
 
 void VescDriveMotor::processMotorControllerState(const vesc_driver::MotorControllerState& state)
 {
+  std::unique_lock<std::mutex> config_lock(config_mutex_);
   std::unique_lock<std::mutex> state_lock(state_mutex_);
 
   ROS_DEBUG_STREAM("VescDriveMotor::processMotorControllerState: speed: " << state.speed);

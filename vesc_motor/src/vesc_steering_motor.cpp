@@ -98,6 +98,7 @@ void VescSteeringMotor::reconfigure(SteeringMotorConfig& config)
 
 void VescSteeringMotor::processMotorControllerState(const vesc_driver::MotorControllerState& state)
 {
+  std::unique_lock<std::mutex> config_lock(config_mutex_);
   std::unique_lock<std::mutex> state_lock(state_mutex_);
 
 //  ROS_INFO_STREAM("VescSteeringMotor::processMotorControllerState: position before prediction: "
