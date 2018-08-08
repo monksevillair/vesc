@@ -17,7 +17,7 @@ namespace vesc_driver
 
 SerialTransport::SerialTransport(uint8_t controller_id, const std::string& port)
   : controller_id_(controller_id),
-    serial_port_(std::string(), 115200, serial::Timeout::simpleTimeout(100), serial::eightbits, serial::parity_none,
+    serial_port_(std::string(), 115200, serial::Timeout::simpleTimeout(200), serial::eightbits, serial::parity_none,
                  serial::stopbits_one, serial::flowcontrol_none)
 {
   // Must not set port in Serial constructor because that would open the port:
