@@ -72,7 +72,7 @@ void SerialPacketCodec::writePayloadId(SerialDataWriter& writer, PayloadId paylo
 MotorControllerState SerialPacketCodec::decodeMotorControllerState(SerialDataReader& reader)
 {
   MotorControllerState result;
-  reader.skipBytes(5);
+  reader.skipBytes(4);
   result.current_motor = reader.readFloat32() / 1e2;
   result.current_input = reader.readFloat32() / 1e2;
 
@@ -87,6 +87,7 @@ MotorControllerState SerialPacketCodec::decodeMotorControllerState(SerialDataRea
   result.displacement = reader.readInt32();
   result.distance_traveled = reader.readInt32();
   result.fault_code = static_cast<MotorControllerState::FaultCode>(reader.readUnsignedInt8());
+  result.position = reader.readFloat32() / 1e6;
 
   return result;
 }
