@@ -74,7 +74,8 @@ double VescSteeringMotor::getVelocity(const ros::Time& time)
 void VescSteeringMotor::setPosition(double position)
 {
   std::unique_lock<std::mutex> config_lock(config_mutex_);
-  driver_->setPosition(position * (config_.invert_direction ? -1. : 1.) + config_.position_offset);
+  const double position_in_rad = position * (config_.invert_direction ? -1. : 1.) + config_.position_offset;
+  driver_->setPosition(position_in_rad / M_PI * 180.);
 }
 
 void VescSteeringMotor::reconfigure(SteeringMotorConfig& config)
@@ -110,7 +111,8 @@ void VescSteeringMotor::processMotorControllerState(const vesc_driver::MotorCont
 //                      << position_kf_.statePre.at<float>(0));
 //    ROS_INFO_STREAM("VescSteeringMotor::processMotorControllerState: position measurement: "
 //                      << (state.position * (config_.invert_direction ? -1. : 1.) - config_.position_offset));
-    correct(state.position * (config_.invert_direction ? -1. : 1.) - config_.position_offset);
+    const double position_in_grad = state.position * (config_.invert_direction ? -1. : 1.) - config_.position_offset;
+    correct(position_in_grad / 180. * M_PI);
   }
   else
   {
