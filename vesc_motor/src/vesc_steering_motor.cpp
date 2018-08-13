@@ -111,8 +111,10 @@ void VescSteeringMotor::processMotorControllerState(const vesc_driver::MotorCont
 //                      << position_kf_.statePre.at<float>(0));
 //    ROS_INFO_STREAM("VescSteeringMotor::processMotorControllerState: position measurement: "
 //                      << (state.position * (config_.invert_direction ? -1. : 1.) - config_.position_offset));
-    const double position_in_grad = state.position * (config_.invert_direction ? -1. : 1.) - config_.position_offset;
-    correct(position_in_grad / 180. * M_PI);
+    const double position_in_grad = state.position;
+    const double position_in_rad = position_in_grad / 180. * M_PI;
+    const double position = position_in_rad * (config_.invert_direction ? -1. : 1.) - config_.position_offset;
+    correct(position);
   }
   else
   {
