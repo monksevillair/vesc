@@ -113,7 +113,7 @@ void VescSteeringMotor::processMotorControllerState(const vesc_driver::MotorCont
 //                      << (state.position * (config_.invert_direction ? -1. : 1.) - config_.position_offset));
     const double position_in_grad = state.position;
     const double position_in_rad = position_in_grad / 180. * M_PI;
-    const double position = position_in_rad * (config_.invert_direction ? -1. : 1.) - config_.position_offset;
+    const double position = (position_in_rad - config_.position_offset) / (config_.invert_direction ? -1. : 1.);
     correct(position);
   }
   else
