@@ -43,8 +43,8 @@ VescSteeringMotor::VescSteeringMotor(const ros::NodeHandle& private_nh, const Dr
   position_kf_.measurementMatrix.at<float>(1) = 0.0f;
 
   // Process noise covariance matrix (Q):
-  // [ Ev 0  ]
-  // [ 0  Ea ]
+  // [ Ep 0  ]
+  // [ 0  Ev ]
   position_kf_.processNoiseCov.at<float>(0, 0) = 1e-2f;
   position_kf_.processNoiseCov.at<float>(1, 1) = 1.0f;
 
@@ -95,6 +95,15 @@ void VescSteeringMotor::reconfigure(SteeringMotorConfig& config)
   {
     createDriver();
   }
+
+  // Process noise covariance matrix (Q):
+  // [ Ep 0  ]
+  // [ 0  Ev ]
+  position_kf_.processNoiseCov.at<float>(0, 0) = config_.process_noise_p;
+  position_kf_.processNoiseCov.at<float>(1, 1) = config_.process_noise_v;
+
+  // Measurement noise covariance matrix (R):
+  cv::setIdentity(position_kf_.measurementNoiseCov, config_.measurement_noise);
 
   ROS_DEBUG_STREAM("VescSteeringMotor::reconfigure::2");
 }

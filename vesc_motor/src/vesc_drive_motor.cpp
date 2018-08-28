@@ -108,6 +108,16 @@ void VescDriveMotor::reconfigure(DriveMotorConfig& config)
   {
     createDriver();
   }
+
+  // Process noise covariance matrix (Q):
+  // [ Ev 0  ]
+  // [ 0  Ea ]
+  speed_kf_.processNoiseCov.at<float>(0, 0) = config_.process_noise_v;
+  speed_kf_.processNoiseCov.at<float>(1, 1) = config_.process_noise_a;
+  ROS_DEBUG_STREAM("VescDriveMotor::VescDriveMotor::7");
+
+  // Measurement noise covariance matrix (R):
+  cv::setIdentity(speed_kf_.measurementNoiseCov, config_.measurement_noise);
 }
 
 void VescDriveMotor::processMotorControllerState(const vesc_driver::MotorControllerState& state)
