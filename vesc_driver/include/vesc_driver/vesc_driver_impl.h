@@ -37,6 +37,8 @@ public:
 
   FirmwareVersion getFirmwareVersion() override;
 
+  bool isMockup() override;
+
 protected:
   struct ResponsePacketVisitor : public boost::static_visitor<>
   {

@@ -122,7 +122,8 @@ void VescSteeringMotor::processMotorControllerState(const vesc_driver::MotorCont
   }
   else
   {
-    ROS_WARN("Skipping state correction due to failed prediction");
+    if (!driver_->isMockup())
+      ROS_WARN("Skipping state correction due to failed prediction");
   }
 //  ROS_INFO_STREAM("VescSteeringMotor::processMotorControllerState: position after correction: "
 //                    << position_kf_.statePost.at<float>(0));

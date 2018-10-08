@@ -147,4 +147,9 @@ void VescDriverImpl::ResponsePacketVisitor::operator()(const FirmwareVersion& pa
 {
   driver_->processFirmwareVersionPacket(packet);
 }
+
+bool VescDriverImpl::isMockup()
+{
+  return false;
+}
 }

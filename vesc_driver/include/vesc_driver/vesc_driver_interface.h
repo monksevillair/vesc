@@ -60,6 +60,8 @@ public:
 
   virtual FirmwareVersion getFirmwareVersion() = 0;
 
+  virtual bool isMockup() = 0;
+
 protected:
   StateHandlerFunction state_handler_function_;
 };

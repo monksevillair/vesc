@@ -126,7 +126,8 @@ void VescDriveMotor::processMotorControllerState(const vesc_driver::MotorControl
   }
   else
   {
-    ROS_WARN("Skipping state correction due to failed prediction");
+    if (!driver_->isMockup())
+      ROS_WARN("Skipping state correction due to failed prediction");
   }
 
   ROS_DEBUG_STREAM("VescDriveMotor::processMotorControllerState: corrected velocity: "

@@ -69,4 +69,9 @@ void VescDriverMockup::execute()
   state_handler_function_(state_to_send);
 }
 
+bool VescDriverMockup::isMockup()
+{
+  return true;
+}
+
 }

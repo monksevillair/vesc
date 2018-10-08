@@ -35,6 +35,8 @@ public:
 
   FirmwareVersion getFirmwareVersion() override;
 
+  bool isMockup() override;
+
 protected:
   void execute();
 
