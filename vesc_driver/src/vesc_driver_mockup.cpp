@@ -81,13 +81,11 @@ void VescDriverMockup::execute()
   state_handler_function_(state_to_send);
 }
 
-<<<<<<< HEAD
 bool VescDriverMockup::isMockup()
 {
   return true;
 }
 
-=======
 void VescDriverMockup::updateState()
 {
   const ros::Time now = ros::Time::now();
@@ -149,5 +147,5 @@ void VescDriverMockup::updateState()
   }
   last_update_time_ = now;
 }
->>>>>>> a68c398b41bef7deb951d8bfae44c5c799f9c96f
+
 }
