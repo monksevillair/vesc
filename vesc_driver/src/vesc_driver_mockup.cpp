@@ -8,6 +8,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
  */
 
 #include <vesc_driver/vesc_driver_mockup.h>
+#include <cmath>
 #include <functional>
 
 namespace vesc_driver
@@ -21,32 +22,42 @@ VescDriverMockup::VescDriverMockup(const std::chrono::duration<double>& sleep_du
 
 void VescDriverMockup::setDutyCycle(double duty_cycle)
 {
-  std::lock_guard<std::mutex> current_state_lock(current_state_mutex_);
-  current_state_.duty_cycle = duty_cycle;
+  std::lock_guard<std::mutex> state_lock(state_mutex_);
+  updateState();
+  control_mode_ = ControlMode::DUTY_CYCLE;
+  command_ = duty_cycle;
 }
 
 void VescDriverMockup::setCurrent(double current)
 {
-  std::lock_guard<std::mutex> current_state_lock(current_state_mutex_);
-  current_state_.current_motor = current;
+  std::lock_guard<std::mutex> state_lock(state_mutex_);
+  updateState();
+  control_mode_ = ControlMode::CURRENT;
+  command_ = current;
 }
 
 void VescDriverMockup::setBrake(double brake)
 {
-  std::lock_guard<std::mutex> current_state_lock(current_state_mutex_);
-  current_state_.current_motor = brake;
+  std::lock_guard<std::mutex> state_lock(state_mutex_);
+  updateState();
+  control_mode_ = ControlMode::BRAKE;
+  command_ = brake;
 }
 
 void VescDriverMockup::setSpeed(double speed)
 {
-  std::lock_guard<std::mutex> current_state_lock(current_state_mutex_);
-  current_state_.speed = speed;
+  std::lock_guard<std::mutex> state_lock(state_mutex_);
+  updateState();
+  control_mode_ = ControlMode::SPEED;
+  command_ = speed;
 }
 
 void VescDriverMockup::setPosition(double position)
 {
-  std::lock_guard<std::mutex> current_state_lock(current_state_mutex_);
-  current_state_.position = position;
+  std::lock_guard<std::mutex> state_lock(state_mutex_);
+  updateState();
+  control_mode_ = ControlMode::POSITION;
+  command_ = position;
 }
 
 FirmwareVersion VescDriverMockup::getFirmwareVersion()
@@ -62,16 +73,81 @@ void VescDriverMockup::execute()
   MotorControllerState state_to_send;
 
   {
-    std::lock_guard<std::mutex> current_state_lock(current_state_mutex_);
-    state_to_send = current_state_;
+    std::lock_guard<std::mutex> state_lock(state_mutex_);
+    updateState();
+    state_to_send = state_;
   }
 
   state_handler_function_(state_to_send);
 }
 
+<<<<<<< HEAD
 bool VescDriverMockup::isMockup()
 {
   return true;
 }
 
+=======
+void VescDriverMockup::updateState()
+{
+  const ros::Time now = ros::Time::now();
+  if (!last_update_time_.isZero() && now > last_update_time_)
+  {
+    const double MAX_CURRENT = 10;
+    const double CURRENT_TO_ACCELERATION = 60 * 15 / MAX_CURRENT;
+
+    const double dt = std::min((now - last_update_time_).toSec(), 1.0);
+    double current = 0.0;
+    switch (control_mode_)
+    {
+      case ControlMode::DUTY_CYCLE:
+      {
+        current = command_ * MAX_CURRENT;
+        break;
+      }
+
+      case ControlMode::CURRENT:
+      {
+        current = command_;
+        break;
+      }
+
+      case ControlMode::BRAKE:
+      {
+        if (std::fabs(state_.speed) > 1.0)
+        {
+          current = (state_.speed < 0.0) ? command_ : -command_;
+        }
+        break;
+      }
+
+      case ControlMode::SPEED:
+      {
+        const double error = command_ - state_.speed;
+        if (std::fabs(error) > 1.0)
+        {
+          current = (error >= 0.0 ? MAX_CURRENT : -MAX_CURRENT);
+        }
+        break;
+      }
+
+      case ControlMode::POSITION:
+      {
+        const double error = command_ - state_.position;
+        const double last_error = command_ - last_position_;
+        const double error_rate = (error - last_error) / dt;
+        current = std::min(std::max(-1.0, error * 0.1 + error_rate * 0.05), 1.0) * MAX_CURRENT;
+        break;
+      }
+    }
+
+    state_.current_motor = current;
+    state_.duty_cycle = current / MAX_CURRENT;
+    state_.speed += current * CURRENT_TO_ACCELERATION * dt;
+    last_position_ = state_.position;
+    state_.position += state_.speed * dt;
+  }
+  last_update_time_ = now;
+}
+>>>>>>> a68c398b41bef7deb951d8bfae44c5c799f9c96f
 }

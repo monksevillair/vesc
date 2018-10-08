@@ -26,7 +26,7 @@ struct MotorControllerState
   double current_motor = 0.0;     // motor current (A)
   double current_input = 0.0;     // input current (A)
   double speed = 0.0;             // electrical speed (ERPM); real speed needs to consider the number of poles
-  double position = 0.0;          // position (rad)
+  double position = 0.0;          // position (degrees)
   double duty_cycle = 0.0;        // duty cycle in [0, 1]
   double charge_drawn = 0.0;      // electric charge drawn (Ah)
   double charge_regen = 0.0;      // electrical charge regenerated (Ah)

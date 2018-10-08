@@ -11,6 +11,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #define VESC_DRIVER_VESC_DRIVER_MOCKUP_H
 
 #include <mutex>
+#include <ros/time.h>
 #include <vesc_driver/packet.h>
 #include <vesc_driver/periodic_task.h>
 #include <vesc_driver/vesc_driver_interface.h>
@@ -38,11 +39,21 @@ public:
   bool isMockup() override;
 
 protected:
+  enum class ControlMode
+  {
+    DUTY_CYCLE, CURRENT, BRAKE, SPEED, POSITION
+  };
+
   void execute();
+  void updateState();
 
   PeriodicTask task_;
-  std::mutex current_state_mutex_;
-  MotorControllerState current_state_;
+  std::mutex state_mutex_;
+  ControlMode control_mode_ = ControlMode::SPEED;
+  double command_ = 0.0;
+  double last_position_ = 0.0;
+  ros::Time last_update_time_;
+  MotorControllerState state_;
 };
 }
 
