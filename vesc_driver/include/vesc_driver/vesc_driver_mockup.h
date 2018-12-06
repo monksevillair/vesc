@@ -38,6 +38,10 @@ public:
 
   bool isMockup() override;
 
+  void setMaxCurrent(double max_current);
+
+  void setCurrentToAcceleration(double current_to_acceleration);
+
 protected:
   enum class ControlMode
   {
@@ -54,6 +58,9 @@ protected:
   double last_position_ = 0.0;
   ros::Time last_update_time_;
   MotorControllerState state_;
+
+  double max_current_;
+  double current_to_acceleration_;
 };
 }
 

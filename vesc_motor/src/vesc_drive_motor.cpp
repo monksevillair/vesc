@@ -10,6 +10,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include <vesc_driver/motor_controller_state.h>
 #include <vesc_driver/vesc_driver_interface.h>
 #include <functional>
+#include <vesc_driver/vesc_driver_mockup.h>
 
 namespace vesc_motor
 {
@@ -107,6 +108,21 @@ void VescDriveMotor::reconfigure(DriveMotorConfig& config)
   if (!driver_)
   {
     createDriver();
+  }
+
+  if (driver_->isMockup())
+  {
+    std::shared_ptr<vesc_driver::VescDriverMockup> casted_driver = std::dynamic_pointer_cast<vesc_driver::VescDriverMockup>(driver_);
+
+    if (!casted_driver)
+    {
+      ROS_ERROR("Mockup can not be casted to mokup class");
+    }
+    else
+    {
+      casted_driver->setMaxCurrent(config_.mockup_max_current);
+      casted_driver->setCurrentToAcceleration(config_.mockup_current_to_acceleration);
+    }
   }
 
   // Process noise covariance matrix (Q):

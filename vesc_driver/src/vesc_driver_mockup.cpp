@@ -15,7 +15,8 @@ namespace vesc_driver
 {
 VescDriverMockup::VescDriverMockup(const std::chrono::duration<double>& sleep_duration,
                                    const VescDriverInterface::StateHandlerFunction& state_handler_function)
-  : VescDriverInterface(state_handler_function), task_(std::bind(&VescDriverMockup::execute, this), sleep_duration)
+  : VescDriverInterface(state_handler_function), task_(std::bind(&VescDriverMockup::execute, this), sleep_duration),
+    max_current_(10.), current_to_acceleration_(90.)
 {
   task_.start();
 }
@@ -91,16 +92,13 @@ void VescDriverMockup::updateState()
   const ros::Time now = ros::Time::now();
   if (!last_update_time_.isZero() && now > last_update_time_)
   {
-    const double MAX_CURRENT = 10;
-    const double CURRENT_TO_ACCELERATION = 60 * 15 / MAX_CURRENT;
-
     const double dt = std::min((now - last_update_time_).toSec(), 1.0);
     double current = 0.0;
     switch (control_mode_)
     {
       case ControlMode::DUTY_CYCLE:
       {
-        current = command_ * MAX_CURRENT;
+        current = command_ * max_current_;
         break;
       }
 
@@ -124,7 +122,7 @@ void VescDriverMockup::updateState()
         const double error = command_ - state_.speed;
         if (std::fabs(error) > 1.0)
         {
-          current = (error >= 0.0 ? MAX_CURRENT : -MAX_CURRENT);
+          current = (error >= 0.0 ? max_current_ : -max_current_);
         }
         break;
       }
@@ -134,18 +132,28 @@ void VescDriverMockup::updateState()
         const double error = command_ - state_.position;
         const double last_error = command_ - last_position_;
         const double error_rate = (error - last_error) / dt;
-        current = std::min(std::max(-1.0, error * 0.1 + error_rate * 0.05), 1.0) * MAX_CURRENT;
+        current = std::min(std::max(-1.0, error * 0.1 + error_rate * 0.05), 1.0) * max_current_;
         break;
       }
     }
 
     state_.current_motor = current;
-    state_.duty_cycle = current / MAX_CURRENT;
-    state_.speed += current * CURRENT_TO_ACCELERATION * dt;
+    state_.duty_cycle = current / max_current_;
+    state_.speed += current * current_to_acceleration_ * dt;
     last_position_ = state_.position;
     state_.position += state_.speed * dt;
   }
   last_update_time_ = now;
+}
+
+void VescDriverMockup::setMaxCurrent(double max_current)
+{
+  max_current_ = max_current;
+}
+
+void VescDriverMockup::setCurrentToAcceleration(double current_to_acceleration)
+{
+  current_to_acceleration_ = current_to_acceleration;
 }
 
 }
