@@ -156,4 +156,9 @@ void VescDriverMockup::setCurrentToAcceleration(double current_to_acceleration)
   current_to_acceleration_ = current_to_acceleration;
 }
 
+void VescDriverMockup::setStatePosition(double pos)
+{
+  state_.position = pos * 180.0 / M_PI;
+}
+
 }

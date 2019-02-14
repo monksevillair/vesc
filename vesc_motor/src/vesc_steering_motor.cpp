@@ -107,6 +107,7 @@ void VescSteeringMotor::reconfigure(SteeringMotorConfig& config)
     }
     else
     {
+      casted_driver->setStatePosition(config_.position_offset);
       casted_driver->setMaxCurrent(config_.mockup_max_current);
       casted_driver->setCurrentToAcceleration(config_.mockup_current_to_acceleration);
     }

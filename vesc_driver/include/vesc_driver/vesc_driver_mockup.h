@@ -42,6 +42,8 @@ public:
 
   void setCurrentToAcceleration(double current_to_acceleration);
 
+  void setStatePosition(double position);
+
 protected:
   enum class ControlMode
   {
