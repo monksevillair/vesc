@@ -14,8 +14,9 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 namespace vesc_motor
 {
-VescDriveMotor::VescDriveMotor(const ros::NodeHandle& private_nh, const DriverFactoryPtr& driver_factory,
-                               const std::chrono::duration<double>& execution_duration)
+VescDriveMotor::VescDriveMotor(
+  const ros::NodeHandle& private_nh, const DriverFactoryPtr& driver_factory,
+  const std::chrono::duration<double>& execution_duration)
   : VescMotor(private_nh, driver_factory, execution_duration), reconfigure_server_(private_nh)
 {
   ROS_DEBUG_STREAM("VescDriveMotor::VescDriveMotor::1");
@@ -26,41 +27,41 @@ VescDriveMotor::VescDriveMotor(const ros::NodeHandle& private_nh, const DriverFa
   unsigned int contr_size = 0; // []
   ROS_DEBUG_STREAM("VescDriveMotor::VescDriveMotor::2");
 
-  speed_kf_ = cv::KalmanFilter(state_size, meas_size, contr_size, CV_32F);
+  state_estimation_filter_ = cv::KalmanFilter(state_size, meas_size, contr_size, CV_32F);
   ROS_DEBUG_STREAM("VescDriveMotor::VescDriveMotor::3");
 
   // Corrected state (x(k)): x(k)=x'(k)+K(k)*(z(k)-H*x'(k)):
   // [v, a]
-  speed_kf_.statePost.at<float>(0) = 0; // v
-  speed_kf_.statePost.at<float>(1) = 0; // a
+  state_estimation_filter_.statePost.at<float>(0) = 0; // v
+  state_estimation_filter_.statePost.at<float>(1) = 0; // a
   ROS_DEBUG_STREAM("VescDriveMotor::VescDriveMotor::4");
 
   // State transition matrix (A):
   // [ 1 dT]
   // [ 0 1]
   // Note: set dT at each processing step!
-  cv::setIdentity(speed_kf_.transitionMatrix);
+  cv::setIdentity(state_estimation_filter_.transitionMatrix);
   ROS_DEBUG_STREAM("VescDriveMotor::VescDriveMotor::5");
 
   // Measurement matrix (H):
   // [ 1 0]
-  speed_kf_.measurementMatrix.at<float>(0) = 1.0f;
-  speed_kf_.measurementMatrix.at<float>(1) = 0.0f;
+  state_estimation_filter_.measurementMatrix.at<float>(0) = 1.0f;
+  state_estimation_filter_.measurementMatrix.at<float>(1) = 0.0f;
   ROS_DEBUG_STREAM("VescDriveMotor::VescDriveMotor::6");
 
   // Process noise covariance matrix (Q):
   // [ Ev 0  ]
   // [ 0  Ea ]
-  speed_kf_.processNoiseCov.at<float>(0, 0) = 1e-2f;
-  speed_kf_.processNoiseCov.at<float>(1, 1) = 1.0f;
+  state_estimation_filter_.processNoiseCov.at<float>(0, 0) = 1e-2f;
+  state_estimation_filter_.processNoiseCov.at<float>(1, 1) = 1.0f;
   ROS_DEBUG_STREAM("VescDriveMotor::VescDriveMotor::7");
 
   // Measurement noise covariance matrix (R):
-  cv::setIdentity(speed_kf_.measurementNoiseCov, 1e-1);
+  cv::setIdentity(state_estimation_filter_.measurementNoiseCov, 1e-1);
   ROS_DEBUG_STREAM("VescDriveMotor::VescDriveMotor::8");
 
   // Priori error estimate covariance matrix (P'(k)): P'(k)=A*P(k-1)*At + Q):
-  cv::setIdentity(speed_kf_.errorCovPre);
+  cv::setIdentity(state_estimation_filter_.errorCovPre);
   ROS_DEBUG_STREAM("VescDriveMotor::VescDriveMotor::9");
 
   reconfigure_server_.setCallback(std::bind(&VescDriveMotor::reconfigure, this, std::placeholders::_1));
@@ -72,13 +73,17 @@ double VescDriveMotor::getVelocity(const ros::Time& time)
 {
   std::unique_lock<std::mutex> state_lock(state_mutex_);
   predict(time);
-  return speed_kf_.statePre.at<float>(0);
+  return state_estimation_filter_.statePre.at<float>(0);
 }
 
 void VescDriveMotor::setVelocity(double velocity)
 {
   std::unique_lock<std::mutex> config_lock(config_mutex_);
   driver_->setSpeed(velocity * getVelocityConversionFactor());
+  //if (private_nh_.getNamespace().rfind("/front_axle/left_motor") != std::string::npos)
+  //{
+  //  ROS_INFO_STREAM("VescDriveMotor::setVelocity: " << private_nh_.getNamespace() << " -- velocity: " << velocity);
+  //}
 }
 
 void VescDriveMotor::brake(double current)
@@ -112,11 +117,11 @@ void VescDriveMotor::reconfigure(DriveMotorConfig& config)
 
   if (driver_->isMockup())
   {
-    std::shared_ptr<vesc_driver::VescDriverMockup> casted_driver = std::dynamic_pointer_cast<vesc_driver::VescDriverMockup>(driver_);
+    const auto casted_driver = std::dynamic_pointer_cast<vesc_driver::VescDriverMockup>(driver_);
 
     if (!casted_driver)
     {
-      ROS_ERROR("Mockup can not be casted to mokup class");
+      ROS_ERROR("Mockup can not be casted to mockup class");
     }
     else
     {
@@ -128,12 +133,12 @@ void VescDriveMotor::reconfigure(DriveMotorConfig& config)
   // Process noise covariance matrix (Q):
   // [ Ev 0  ]
   // [ 0  Ea ]
-  speed_kf_.processNoiseCov.at<float>(0, 0) = config_.process_noise_v;
-  speed_kf_.processNoiseCov.at<float>(1, 1) = config_.process_noise_a;
+  state_estimation_filter_.processNoiseCov.at<float>(0, 0) = config_.process_noise_v;
+  state_estimation_filter_.processNoiseCov.at<float>(1, 1) = config_.process_noise_a;
   ROS_DEBUG_STREAM("VescDriveMotor::VescDriveMotor::7");
 
   // Measurement noise covariance matrix (R):
-  cv::setIdentity(speed_kf_.measurementNoiseCov, config_.measurement_noise);
+  cv::setIdentity(state_estimation_filter_.measurementNoiseCov, config_.measurement_noise);
 }
 
 void VescDriveMotor::processMotorControllerState(const vesc_driver::MotorControllerState& state)
@@ -150,14 +155,13 @@ void VescDriveMotor::processMotorControllerState(const vesc_driver::MotorControl
 
     correct(state.speed / getVelocityConversionFactor());
   }
-  else
+  else if (!driver_->isMockup())
   {
-    if (!driver_->isMockup())
-      ROS_WARN("Skipping state correction due to failed prediction");
+    ROS_WARN("Skipping state correction due to failed prediction");
   }
 
   ROS_DEBUG_STREAM("VescDriveMotor::processMotorControllerState: corrected velocity: "
-                     << speed_kf_.statePost.at<float>(0));
+                     << state_estimation_filter_.statePost.at<float>(0));
 }
 
 double VescDriveMotor::getVelocityConversionFactor() const
@@ -179,8 +183,15 @@ bool VescDriveMotor::predict(const ros::Time& time)
       ROS_DEBUG_STREAM("VescDriveMotor::predict::3");
 
       const double dt = (time - last_prediction_time_).toSec();
-      speed_kf_.transitionMatrix.at<float>(0, 1) = static_cast<float>(dt);
-      speed_kf_.predict();
+      state_estimation_filter_.transitionMatrix.at<float>(0, 1) = static_cast<float>(dt);
+      state_estimation_filter_.predict();
+
+      //if (private_nh_.getNamespace().rfind("/front_axle/left_motor") != std::string::npos)
+      //{
+      //  ROS_INFO_STREAM("VescDriveMotor::predict: " << private_nh_.getNamespace() << " -- v: "
+      //                                              << state_estimation_filter_.statePre.at<float>(0) << ", a: "
+      //                                              << state_estimation_filter_.statePre.at<float>(1) << ", dt: " << dt);
+      //}
     }
 
     ROS_DEBUG_STREAM("VescDriveMotor::predict::4");
@@ -200,8 +211,14 @@ void VescDriveMotor::correct(double velocity)
 
   // Kalman Correction
   const cv::Vec<float, 1> measurement(static_cast<float>(velocity));
-  speed_kf_.correct(cv::Mat(measurement, false));
+  state_estimation_filter_.correct(cv::Mat(measurement, false));
 
+  //if (private_nh_.getNamespace().rfind("/front_axle/left_motor") != std::string::npos)
+  //{
+  //  ROS_INFO_STREAM("VescDriveMotor::correct: " << private_nh_.getNamespace() << " -- v: "
+  //                                              << state_estimation_filter_.statePost.at<float>(0) << ", a: "
+  //                                              << state_estimation_filter_.statePost.at<float>(1) << ", velocity: " << velocity);
+  //}
   ROS_DEBUG_STREAM("VescDriveMotor::correct::2");
 }
 }

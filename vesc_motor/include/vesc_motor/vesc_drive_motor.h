@@ -12,7 +12,6 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 #include <dynamic_reconfigure/server.h>
 #include <mutex>
-#include <opencv2/core/core.hpp>
 #include <opencv2/video/tracking.hpp>
 #include <ros/node_handle.h>
 #include <ros/time.h>
@@ -60,7 +59,7 @@ protected:
   DriveMotorConfig config_;
 
   std::mutex state_mutex_;
-  cv::KalmanFilter speed_kf_;
+  cv::KalmanFilter state_estimation_filter_;
   ros::Time last_prediction_time_;
 };
 }

@@ -120,19 +120,14 @@ void VescDriverMockup::updateState()
       case ControlMode::SPEED:
       {
         const double error = command_ - state_.speed;
-        if (std::fabs(error) > 1.0)
-        {
-          current = (error >= 0.0 ? max_current_ : -max_current_);
-        }
+        current = std::min(std::max(-1.0, error * 0.05), 1.0) * max_current_;
         break;
       }
 
       case ControlMode::POSITION:
       {
         const double error = command_ - state_.position;
-        const double last_error = command_ - last_position_;
-        const double error_rate = (error - last_error) / dt;
-        current = std::min(std::max(-1.0, error * 0.1 + error_rate * 0.05), 1.0) * max_current_;
+        current = std::min(std::max(-1.0, error * 0.1 - state_.speed * 0.05), 1.0) * max_current_;
         break;
       }
     }
@@ -140,7 +135,6 @@ void VescDriverMockup::updateState()
     state_.current_motor = current;
     state_.duty_cycle = current / max_current_;
     state_.speed += current * current_to_acceleration_ * dt;
-    last_position_ = state_.position;
     state_.position += state_.speed * dt;
   }
   last_update_time_ = now;

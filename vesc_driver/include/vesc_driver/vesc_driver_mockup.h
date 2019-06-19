@@ -57,7 +57,6 @@ protected:
   std::mutex state_mutex_;
   ControlMode control_mode_ = ControlMode::SPEED;
   double command_ = 0.0;
-  double last_position_ = 0.0;
   ros::Time last_update_time_;
   MotorControllerState state_;
 

@@ -29,12 +29,12 @@ protected:
   void createDriver();
   virtual void processMotorControllerState(const vesc_driver::MotorControllerState& state) = 0;
 
+  ros::NodeHandle private_nh_;
   vesc_driver::VescDriverInterfacePtr driver_;
 
 private:
   void callProcessMotorControllerState(const vesc_driver::MotorControllerState& state);
 
-  ros::NodeHandle private_nh_;
   DriverFactoryPtr driver_factory_;
   std::chrono::duration<double> execution_duration_;
   std::atomic<double> supply_voltage_;
