@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="respawn" default="false"/>
+  <arg name="controller_id"/>
+  <arg name="transport_controller_id" default="$(arg controller_id)"/>
+  <arg name="port"/>
+  <arg name="sleep_duration" default="0.1"/>
+
+  <node name="vesc_j0" pkg="vesc_driver" type="vesc_driver_node" output="screen" respawn="$(arg respawn)">
+    <param name="controller_id" type="int" value="$(arg controller_id)"/>
+    <param name="transport_controller_id" type="int" value="$(arg transport_controller_id)"/>
+    <param name="port" type="str" value="$(arg port)"/>
+    <param name="sleep_duration" type="double" value="$(arg sleep_duration)"/>
+  </node>
+</launch>
